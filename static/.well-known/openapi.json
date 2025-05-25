@@ -1,0 +1,292 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sonarr MCP API",
+    "description": "API for interacting with Sonarr through MCP",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/mcp/sonarr-query": {
+      "post": {
+        "summary": "Sonarr Query",
+        "operationId": "sonarr_query_mcp_sonarr_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SonarrQueryModel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/sonarr-capabilities": {
+      "get": {
+        "summary": "List Sonarr Capabilities",
+        "operationId": "list_sonarr_capabilities_mcp_sonarr_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/sonarr-help": {
+      "get": {
+        "summary": "Sonarr Help",
+        "operationId": "sonarr_help_mcp_sonarr_help_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp/sonarr-operation-params/{operation_id}": {
+      "get": {
+        "summary": "Get Required Params",
+        "operationId": "get_required_params_mcp_sonarr_operation_params__operation_id__get",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp/sonarr-status": {
+      "get": {
+        "summary": "Get Sonarr Status",
+        "description": "Check if the Sonarr API is accessible and the API key is valid.",
+        "operationId": "get_sonarr_status_mcp_sonarr_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "API Welcome Page",
+        "description": "Welcome page for the Sonarr MCP API. This endpoint does not require authentication.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Welcome message",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "message": "Welcome to Sonarr MCP API"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api-key": {
+      "get": {
+        "summary": "Retrieve API Key",
+        "description": "Retrieves the current API key. This endpoint is only accessible from localhost for security reasons.",
+        "operationId": "get_api_key_endpoint_api_key_get",
+        "responses": {
+          "200": {
+            "description": "The current API key",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "example": {
+                  "api_key": "example1234567890abcdef"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied - endpoint only accessible from localhost"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "SonarrQueryModel": {
+        "properties": {
+          "intent": {
+            "type": "string",
+            "title": "Intent"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intent"
+        ],
+        "title": "SonarrQueryModel"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Sonarr MCP Assistant",
+  "name_for_model": "sonarr_mcp",
+  "description_for_model": "Access and control Sonarr media automation features through an MCP server using OpenAPI operations.",
+  "auth": {
+    "type": "service_http",
+    "authorization_type": "bearer",
+    "verification_tokens": {
+      "openai": "your-openai-verification-token"
+    }
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://mcp.zenmedia.live/.well-known/openapi.yaml",
+    "has_user_authentication": true
+  },
+  "logo_url": "https://mcp.zenmedia.live/logo.png",
+  "contact_email": "admin@zenmedia.live",
+  "legal_info_url": "https://zenmedia.live/legal"
+}
