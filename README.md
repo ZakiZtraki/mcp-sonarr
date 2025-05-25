@@ -2,6 +2,67 @@
 
 This is a FastAPI application that provides an API for interacting with Sonarr through an MCP server. It includes an AI plugin configuration for integration with AI assistants.
 
+## Project Structure
+
+The project has been refactored to follow a more modular and maintainable structure:
+
+```
+mcp-sonarr/
+│
+├── app/                              # Main application package
+│   ├── __init__.py                   # Package initializer
+│   ├── main.py                       # Application entry point
+│   ├── config/                       # Configuration management
+│   │   ├── __init__.py
+│   │   ├── settings.py               # Application settings and environment variables
+│   │   └── security.py               # Security and authentication logic
+│   │
+│   ├── api/                          # API routes and endpoints
+│   │   ├── __init__.py
+│   │   ├── routes/                   # Route definitions
+│   │   │   ├── __init__.py
+│   │   │   ├── sonarr.py             # Sonarr-specific routes
+│   │   │   └── system.py             # System and authentication routes
+│   │   │
+│   │   └── dependencies.py           # Shared API dependencies
+│   │
+│   ├── core/                         # Core application logic
+│   │   ├── __init__.py
+│   │   ├── security.py               # Security utilities
+│   │   └── utils.py                  # General utilities
+│   │
+│   ├── services/                     # Service layer
+│   │   ├── __init__.py
+│   │   └── sonarr_service.py         # Sonarr API interaction logic
+│   │
+│   └── models/                       # Data models
+│       ├── __init__.py
+│       ├── sonarr.py                 # Sonarr-specific models
+│       └── api.py                    # API request/response models
+│
+├── static/                           # Static files
+│   └── .well-known/
+│       ├── ai-plugin.json
+│       ├── openapi.json
+│       └── openapi.yaml
+│
+├── scripts/                          # Utility scripts
+│   └── generate_openapi.py           # Script to generate OpenAPI schema
+│
+├── tests/                            # Tests directory
+│   ├── __init__.py
+│   ├── test_api.py
+│   └── test_sonarr_service.py
+│
+├── .env.example                      # Example environment file
+├── .gitignore                        # Git ignore file
+├── README.md                         # Project documentation
+├── requirements.txt                  # Project dependencies
+├── Dockerfile                        # Docker configuration
+├── docker-compose.yaml               # Docker Compose configuration
+└── run.py                            # Convenience script to run the application
+```
+
 ## Getting Started
 
 ### Prerequisites
@@ -40,7 +101,7 @@ This is a FastAPI application that provides an API for interacting with Sonarr t
 3. **Install dependencies**:
 
    ```bash
-   pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv
+   pip install -r requirements.txt
    ```
 
 4. **Configure environment variables** as described in the sections below.
@@ -94,7 +155,7 @@ If you're using the auto-generated API key, you can retrieve it in several ways:
    Get-Content .api_key
    ```
 
-3. **From the API**: You can also add an endpoint to retrieve the current API key (only accessible from localhost):
+3. **From the API**: You can also retrieve the current API key (only accessible from localhost):
 
    ```bash
    curl http://localhost:8000/api-key
@@ -150,19 +211,25 @@ The application also connects to a Sonarr instance. You need to configure the So
 1. Install the required dependencies:
 
    ```bash
-   pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv
+   pip install -r requirements.txt
    ```
 
 2. Run the application:
 
    ```bash
-   uvicorn app:app --host 0.0.0.0 --port 8000
+   python run.py
+   ```
+
+   Or directly with uvicorn:
+
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
 3. Generate the OpenAPI schema:
 
    ```bash
-   python generate_openapi.py
+   python scripts/generate_openapi.py
    ```
 
 ### Using Docker Compose (Recommended)
@@ -198,6 +265,14 @@ For the easiest deployment, you can use Docker Compose:
    ```bash
    docker compose down
    ```
+
+## API Endpoints
+
+- `POST /mcp/sonarr-query`: Query Sonarr with an intent
+- `GET /mcp/sonarr-capabilities`: List available Sonarr capabilities
+- `GET /mcp/sonarr-help`: Get help information for Sonarr commands
+- `GET /mcp/sonarr-operation-params/{operation_id}`: Get parameters for a specific operation
+- `GET /mcp/sonarr-status`: Check if the Sonarr API is accessible and the API key is valid
 
 ## AI Plugin Configuration
 
@@ -241,13 +316,23 @@ By using this MCP server integration with AI assistants, you acknowledge and agr
    - Be aware that when using AI assistants with this integration, information about your media library may be processed by the AI service
    - Review the privacy policy of any AI assistant you connect to this integration
 
-## API Endpoints
+## Development
 
-- `POST /mcp/sonarr-query`: Query Sonarr with an intent
-- `GET /mcp/sonarr-capabilities`: List available Sonarr capabilities
-- `GET /mcp/sonarr-help`: Get help information for Sonarr commands
-- `GET /mcp/sonarr-operation-params/{operation_id}`: Get parameters for a specific operation
-- `GET /mcp/sonarr-status`: Check if the Sonarr API is accessible and the API key is valid
+### Running Tests
+
+To run the tests:
+
+```bash
+pytest
+```
+
+### Generating OpenAPI Schema
+
+To generate the OpenAPI schema:
+
+```bash
+python scripts/generate_openapi.py
+```
 
 ## Troubleshooting
 

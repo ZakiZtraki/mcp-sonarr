@@ -1,6 +1,12 @@
 import json
 import yaml
-from app import app
+import os
+import sys
+
+# Add the parent directory to the path so we can import the app
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.main import app
 
 # Get the OpenAPI schema as a dictionary
 openapi_schema = app.openapi()
@@ -32,6 +38,9 @@ for path in openapi_schema["paths"]:
         else:
             # Add security for protected paths
             openapi_schema["paths"][path][method]["security"] = [{"bearerAuth": []}]
+
+# Ensure the static directory exists
+os.makedirs("static/.well-known", exist_ok=True)
 
 # Save as JSON
 with open("static/.well-known/openapi.json", "w") as f:
