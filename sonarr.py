@@ -9,8 +9,8 @@ from typing import Optional
 
 # Configuration class for Sonarr API settings
 class SonarrSettings(BaseSettings):
-    api_key: str = os.getenv("SONARR_API_KEY", "a8bb15e3d1c5702e1a854a2ea29655a70537a64f")
-    api_url: str = os.getenv("SONARR_API_URL", "https://sonarr.zakitraki.com/api")
+    api_key: str = os.getenv("SONARR_API_KEY", "")
+    api_url: str = os.getenv("SONARR_API_URL", "")
     openapi_url: str = "https://raw.githubusercontent.com/Sonarr/Sonarr/develop/src/Sonarr.Api.V3/openapi.json"
     cache_path: str = os.path.join(os.path.dirname(__file__), "sonarr_openapi_cache.json")
     
@@ -86,6 +86,13 @@ def get_operation_parameters(operation_id):
 
 def validate_api_key():
     """Validate the Sonarr API key by making a test request."""
+    if not SONARR_API_KEY:
+        print("Error: SONARR_API_KEY environment variable is not set")
+        return False
+    if not SONARR_API_URL:
+        print("Error: SONARR_API_URL environment variable is not set")
+        return False
+        
     try:
         resp = httpx.get(f"{SONARR_API_URL}/system/status", headers=SONARR_HEADERS, timeout=10)
         resp.raise_for_status()

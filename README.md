@@ -69,6 +69,8 @@ curl -H "Authorization: Bearer your-api-key-here" https://your-server/mcp/sonarr
 
 The application also connects to a Sonarr instance. You need to configure the Sonarr API settings:
 
+> **IMPORTANT**: Never commit your actual API keys or URLs to the repository. Always use environment variables or a `.env` file that is excluded from version control (add `.env` to your `.gitignore` file).
+
 1. Set the following environment variables:
 
    ```bash
@@ -89,6 +91,14 @@ The application also connects to a Sonarr instance. You need to configure the So
    SONARR_API_KEY=your-sonarr-api-key
    SONARR_API_URL=https://your-sonarr-instance/api
    ```
+
+   A sample `.env.example` file is provided in the repository. You can copy it to create your own `.env` file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Then edit the `.env` file with your actual API key and URL.
 
 ## Running the Application
 
