@@ -1,0 +1,21 @@
+services:
+  mcp-sonarr:
+    build:
+      context: .
+    image: mcp-sonarr:latest
+    container_name: mcp-sonarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_API_KEY=${MCP_API_KEY:-}  # Will use auto-generated key if not provided
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - SONARR_API_URL=${SONARR_API_URL}
+    volumes:
+      - ./.api_key:/app/.api_key  # Persist the auto-generated API key
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge

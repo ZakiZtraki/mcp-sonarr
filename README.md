@@ -2,6 +2,49 @@
 
 This is a FastAPI application that provides an API for interacting with Sonarr through an MCP server. It includes an AI plugin configuration for integration with AI assistants.
 
+## Getting Started
+
+### Prerequisites
+
+- Python 3.8 or higher
+- pip (Python package installer)
+- A Sonarr instance with API access
+- Git (optional, for cloning the repository)
+
+### Installation
+
+1. **Clone or download the repository**:
+
+   Using Git:
+   ```bash
+   git clone https://github.com/ZakiZtraki/mcp-sonarr.git
+   cd mcp-sonarr
+   ```
+
+   Alternatively, you can download the ZIP file from GitHub and extract it.
+
+2. **Set up a virtual environment** (recommended):
+
+   On Linux/macOS:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   ```
+
+   On Windows:
+   ```powershell
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   ```
+
+3. **Install dependencies**:
+
+   ```bash
+   pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv
+   ```
+
+4. **Configure environment variables** as described in the sections below.
+
 ## Authentication
 
 The API uses Bearer token authentication. You need to include an API key in the `Authorization` header of your requests.
@@ -102,6 +145,8 @@ The application also connects to a Sonarr instance. You need to configure the So
 
 ## Running the Application
 
+### Standard Method
+
 1. Install the required dependencies:
 
    ```bash
@@ -120,6 +165,40 @@ The application also connects to a Sonarr instance. You need to configure the So
    python generate_openapi.py
    ```
 
+### Using Docker Compose (Recommended)
+
+For the easiest deployment, you can use Docker Compose:
+
+1. Make sure you have [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed.
+
+2. Create a `.env` file with your Sonarr API settings:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit the `.env` file with your actual Sonarr API key and URL.
+
+3. Start the application using Docker Compose:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   This will build the Docker image and start the container in detached mode.
+
+4. Check the logs to see the auto-generated API key (if you didn't specify one):
+
+   ```bash
+   docker compose logs
+   ```
+
+5. To stop the application:
+
+   ```bash
+   docker compose down
+   ```
+
 ## AI Plugin Configuration
 
 The AI plugin configuration is located at `static/.well-known/ai-plugin.json`. It uses service_http authentication with a bearer token.
@@ -130,6 +209,38 @@ To use the plugin with an AI assistant, you need to:
 2. Configure the AI assistant to use the plugin
 3. Provide the API key when prompted by the AI assistant
 
+### Disclaimer: AI Assistant Access and User Responsibility
+
+**IMPORTANT: Please read this section carefully before using this integration.**
+
+By using this MCP server integration with AI assistants, you acknowledge and agree to the following:
+
+1. **Access Level**: This integration grants AI assistants the ability to interact with your Sonarr instance through the API. This includes the ability to:
+   - View your media library and download history
+   - Add, modify, or delete series from your library
+   - Trigger searches and downloads
+   - Access system information from your Sonarr instance
+
+2. **User Responsibility**: 
+   - You are solely responsible for the installation, configuration, and use of this MCP server
+   - You should only provide API access to AI assistants you trust
+   - You should regularly monitor the actions performed through this integration
+   - Consider using a Sonarr API key with limited permissions if possible
+
+3. **Security Considerations**:
+   - Exposing this service to the internet carries inherent security risks
+   - Always use strong, unique API keys and proper authentication
+   - Consider implementing additional security measures like a reverse proxy with authentication
+
+4. **Liability Limitation**:
+   - The developers of this integration are not responsible for any unexpected behavior, data loss, or security issues that may arise from its use
+   - Use this integration at your own risk
+   - Test in a non-production environment before deploying to your main Sonarr instance
+
+5. **Privacy Implications**:
+   - Be aware that when using AI assistants with this integration, information about your media library may be processed by the AI service
+   - Review the privacy policy of any AI assistant you connect to this integration
+
 ## API Endpoints
 
 - `POST /mcp/sonarr-query`: Query Sonarr with an intent
@@ -137,3 +248,31 @@ To use the plugin with an AI assistant, you need to:
 - `GET /mcp/sonarr-help`: Get help information for Sonarr commands
 - `GET /mcp/sonarr-operation-params/{operation_id}`: Get parameters for a specific operation
 - `GET /mcp/sonarr-status`: Check if the Sonarr API is accessible and the API key is valid
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Error: SONARR_API_KEY environment variable is not set"**
+   - Make sure you've set the SONARR_API_KEY environment variable or added it to your .env file
+   - Verify that your .env file is in the correct location (project root)
+
+2. **"Error: SONARR_API_URL environment variable is not set"**
+   - Make sure you've set the SONARR_API_URL environment variable or added it to your .env file
+   - The URL should include the full path to the API (e.g., https://sonarr.example.com/api)
+
+3. **"API key validation failed"**
+   - Verify that your Sonarr instance is running and accessible
+   - Check that the API key is correct and has the necessary permissions in Sonarr
+   - Ensure there are no network issues preventing access to your Sonarr instance
+
+4. **"This endpoint is only accessible from localhost"**
+   - The /api-key endpoint is restricted to localhost for security reasons
+   - Access this endpoint only from the same machine where the server is running
+
+### Getting Help
+
+If you encounter issues not covered here, please:
+1. Check the application logs for more detailed error messages
+2. Open an issue on the GitHub repository with details about your problem
+3. Include relevant error messages and your environment configuration (without sensitive information)
