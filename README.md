@@ -268,15 +268,46 @@ For the easiest deployment, you can use Docker Compose:
 
 ## API Endpoints
 
+### OpenAI Plugin Endpoints
+- `/.well-known/ai-plugin.json`: Plugin manifest
+- `/openapi.yaml` or `/openapi.json`: API specification
+- `/api/v1/tools`: List available tools
+- `/api/v1/schema`: Get tool schemas
+- `/api/v1/call`: Call a specific tool
+- `/test`: Test endpoint (no authentication required)
+
+### Legacy Endpoints
 - `POST /mcp/sonarr-query`: Query Sonarr with an intent
 - `GET /mcp/sonarr-capabilities`: List available Sonarr capabilities
 - `GET /mcp/sonarr-help`: Get help information for Sonarr commands
 - `GET /mcp/sonarr-operation-params/{operation_id}`: Get parameters for a specific operation
 - `GET /mcp/sonarr-status`: Check if the Sonarr API is accessible and the API key is valid
+- `/mcp_list_tools`: Legacy MCP tool listing endpoint
+- `/mcp_tool_schema`: Legacy MCP tool schema endpoint
+- `/mcp_call_tool`: Legacy MCP tool call endpoint
 
 ## AI Plugin Configuration
 
 The AI plugin configuration is located at `static/.well-known/ai-plugin.json`. It uses service_http authentication with a bearer token.
+
+### OpenAI Plugin Integration
+
+The plugin supports direct tool calls to the root endpoint (`/`). OpenAI can send tool calls in the following format:
+
+```json
+{
+  "name": "search_series",
+  "arguments": {
+    "title": "Breaking Bad"
+  }
+}
+```
+
+Available tools:
+- `search_series`: Search for TV series by title
+- `get_series`: Get details about a specific TV series by ID
+- `add_series`: Add a new TV series to Sonarr
+- `get_calendar`: Get upcoming episodes from the Sonarr calendar
 
 To use the plugin with an AI assistant, you need to:
 

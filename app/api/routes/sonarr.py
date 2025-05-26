@@ -5,6 +5,11 @@ from app.services.sonarr_service import sonarr_service
 
 router = APIRouter(prefix="/mcp", tags=["sonarr"])
 
+@router.get("/test", include_in_schema=True, dependencies=[])
+async def test_endpoint():
+    """A simple test endpoint that doesn't require authentication."""
+    return {"status": "ok", "message": "Test endpoint is working."}
+
 @router.post("/sonarr-query", response_model=TextResponse)
 async def sonarr_query(request: SonarrQueryModel, api_key: str = Depends(validate_token)):
     intent = request.intent.lower()

@@ -11,6 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Create necessary directories for OpenAPI schema
+RUN mkdir -p static/.well-known static
+
 # Generate OpenAPI schema
 RUN python scripts/generate_openapi.py
 

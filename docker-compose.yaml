@@ -13,9 +13,13 @@ services:
       - SONARR_API_URL=${SONARR_API_URL}
     volumes:
       - ./.api_key:/app/.api_key  # Persist the auto-generated API key
+      - ./static:/app/static  # Mount the static directory
     networks:
       - mcp-network
+      - sonarr_default
 
 networks:
   mcp-network:
     driver: bridge
+  sonarr_default:
+    external: true
