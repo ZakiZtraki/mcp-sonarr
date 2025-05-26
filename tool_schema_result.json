@@ -1,0 +1,30 @@
+{
+  "name": "put__api_v3_episode_monitor",
+  "description": "PUT /api/v3/episode/monitor (Tag: Episode)",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "includeImages": {
+        "type": "boolean",
+        "default": false
+      },
+      "episodeIds": {
+        "type": "array",
+        "description": "episodeIds parameter",
+        "items": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "monitored": {
+        "type": "boolean",
+        "description": "monitored parameter"
+      }
+    },
+    "required": []
+  },
+  "returns": {
+    "type": "object",
+    "description": "Response from Sonarr API"
+  }
+}

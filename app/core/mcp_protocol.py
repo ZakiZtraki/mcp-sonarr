@@ -313,6 +313,73 @@ def handle_tools_call(request: Dict[str, Any], sonarr_service) -> Dict[str, Any]
                 }
             )
             
+        elif tool_name == "discover_tools":
+            # Get parameters
+            category = arguments.get("category", "All")
+            keyword = arguments.get("keyword", "")
+            max_results = arguments.get("max_results", 10)
+            
+            # Import the necessary functions
+            from app.services.openai_tools_service import openai_tools_service
+            
+            # Get the tools based on category and keyword
+            include_tags = None
+            if category != "All":
+                include_tags = [category]
+                
+            # Get dynamic tools from Sonarr OpenAPI
+            capabilities = [keyword] if keyword else []
+            
+            dynamic_tools = openai_tools_service.get_tools(
+                capabilities=capabilities,
+                include_tags=include_tags,
+                max_tools=max_results
+            )
+            
+            # Format the response
+            tool_list = []
+            for t in dynamic_tools:
+                tool_list.append({
+                    "name": t["function"]["name"],
+                    "description": t["function"]["description"]
+                })
+            
+            return create_jsonrpc_response(
+                id=request.get("id"),
+                result={"tools": tool_list}
+            )
+            
+        elif tool_name == "get_tool_schema":
+            # Get the tool name parameter
+            tool_name_param = arguments.get("tool_name")
+            if not tool_name_param:
+                return create_jsonrpc_error(
+                    id=request.get("id"),
+                    code=-32602,
+                    message="Missing required parameter: tool_name"
+                )
+            
+            # Import the necessary functions
+            from app.services.openai_tools_service import openai_tools_service
+            
+            # Get all tools
+            all_tools = openai_tools_service.get_tools()
+            
+            # Find the tool by name
+            tool = next((t for t in all_tools if t["function"]["name"] == tool_name_param), None)
+            if not tool:
+                return create_jsonrpc_error(
+                    id=request.get("id"),
+                    code=-32602,
+                    message=f"Tool not found: {tool_name_param}"
+                )
+            
+            # Return the tool schema
+            return create_jsonrpc_response(
+                id=request.get("id"),
+                result={"schema": tool}
+            )
+            
         else:
             return create_jsonrpc_error(
                 id=request.get("id"),

@@ -82,6 +82,7 @@ class SonarrService:
         operation_map = {
             "search_series": {"path": "/api/v3/series/lookup", "method": "get", "query_params": ["term"]},
             "get_series": {"path": "/api/v3/series/{id}", "method": "get"},
+            "get_all_series": {"path": "/api/v3/series", "method": "get"},
             "add_series": {"path": "/api/v3/series", "method": "post"},
             "get_calendar": {"path": "/api/v3/calendar", "method": "get", "query_params": ["start", "end"]},
             "get_quality_profiles": {"path": "/api/v3/qualityprofile", "method": "get"},

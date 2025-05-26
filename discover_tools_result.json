@@ -1,0 +1,12 @@
+{
+  "tools": [
+    {
+      "name": "post__api_v3_series",
+      "description": "POST /api/v3/series (Tag: Series)"
+    },
+    {
+      "name": "put__api_v3_series__id_",
+      "description": "PUT /api/v3/series/{id} (Tag: Series)"
+    }
+  ]
+}

@@ -28,16 +28,17 @@ openapi_schema["components"]["securitySchemes"] = {
 
 # Define paths that should not require authentication
 public_paths = [
-    "/api-key",         # API key retrieval endpoint
-    "/",                # Root endpoint
-    "/test",            # Root test endpoint
-    "/mcp/test",        # Legacy test endpoint
-    "/api/v1/tools",    # OpenAI tools listing endpoint
-    "/api/v1/schema",   # OpenAI schema endpoint
-    "/mcp_list_tools",  # Legacy MCP tool listing endpoint
-    "/mcp_tool_schema", # Legacy MCP tool schema endpoint
-    "/openapi.yaml",    # OpenAPI YAML specification
-    "/openapi.json"     # OpenAPI JSON specification
+    "/api-key",             # API key retrieval endpoint
+    "/",                    # Root endpoint
+    "/test",                # Root test endpoint
+    "/mcp/test",            # Legacy test endpoint
+    "/api/v1/tools",        # OpenAI tools listing endpoint
+    "/api/v1/schema",       # OpenAI schema endpoint
+    "/api/v1/openai-tools", # OpenAI function calling format tools
+    "/mcp_list_tools",      # Legacy MCP tool listing endpoint
+    "/mcp_tool_schema",     # Legacy MCP tool schema endpoint
+    "/openapi.yaml",        # OpenAPI YAML specification
+    "/openapi.json"         # OpenAPI JSON specification
 ]
 
 # Add security requirement to paths (except public ones)

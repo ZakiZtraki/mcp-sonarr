@@ -1,0 +1,52 @@
+{
+  "tools": [
+    {
+      "name": "get__api_v3_calendar",
+      "description": "GET /api/v3/calendar (Tag: Calendar)"
+    },
+    {
+      "name": "get__feed_v3_calendar_sonarr_ics",
+      "description": "GET /feed/v3/calendar/sonarr.ics (Tag: CalendarFeed)"
+    },
+    {
+      "name": "get__api_v3_wanted_cutoff",
+      "description": "GET /api/v3/wanted/cutoff (Tag: Cutoff)"
+    },
+    {
+      "name": "put__api_v3_episode__id_",
+      "description": "PUT /api/v3/episode/{id} (Tag: Episode)"
+    },
+    {
+      "name": "put__api_v3_episode_monitor",
+      "description": "PUT /api/v3/episode/monitor (Tag: Episode)"
+    },
+    {
+      "name": "put__api_v3_importlist__id_",
+      "description": "PUT /api/v3/importlist/{id} (Tag: ImportList)"
+    },
+    {
+      "name": "post__api_v3_importlist_test",
+      "description": "POST /api/v3/importlist/test (Tag: ImportList)"
+    },
+    {
+      "name": "post__api_v3_importlist_action__name_",
+      "description": "POST /api/v3/importlist/action/{name} (Tag: ImportList)"
+    },
+    {
+      "name": "put__api_v3_config_mediamanagement__id_",
+      "description": "PUT /api/v3/config/mediamanagement/{id} (Tag: MediaManagementConfig)"
+    },
+    {
+      "name": "get__api_v3_wanted_missing",
+      "description": "GET /api/v3/wanted/missing (Tag: Missing)"
+    },
+    {
+      "name": "post__api_v3_seasonpass",
+      "description": "POST /api/v3/seasonpass (Tag: SeasonPass)"
+    },
+    {
+      "name": "put__api_v3_series_editor",
+      "description": "PUT /api/v3/series/editor (Tag: SeriesEditor)"
+    }
+  ]
+}
