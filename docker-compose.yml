@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mcp-sonarr:
     build:
@@ -8,7 +6,7 @@ services:
     container_name: mcp-sonarr
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       # Required: Your Sonarr instance URL
       - SONARR_URL=${SONARR_URL:-https://sonarr.zenmedia.live}
