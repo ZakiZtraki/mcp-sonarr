@@ -21,6 +21,7 @@ import uvicorn
 from dotenv import load_dotenv
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .sonarr_client import SonarrClient, SonarrConfig
 
@@ -63,9 +64,14 @@ def get_auth_token() -> Optional[str]:
 # ==================== Create FastMCP Server ====================
 
 # Create FastMCP instance with JSON response mode for stateless operation
+# Disable DNS rebinding protection since we run behind a reverse proxy
+# (Traefik, nginx, Zoraxy, etc.) which handles security at the proxy layer
 mcp = FastMCP(
     SERVER_NAME,
     json_response=True,  # Enables stateless mode for better compatibility
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
+    ),
 )
 
 
