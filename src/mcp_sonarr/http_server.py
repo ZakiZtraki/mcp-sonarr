@@ -1,24 +1,28 @@
-"""HTTP/SSE Transport for MCP Server - Enables remote access for Claude/ChatGPT."""
+"""HTTP/SSE Transport for MCP Server - Enables remote access for Claude/ChatGPT.
+
+This module provides a proper MCP-compliant HTTP server using StreamableHTTP transport,
+making it compatible with ChatGPT's native MCP support.
+"""
 
 import os
-import json
-import asyncio
+import contextlib
 import logging
 from typing import Optional
-from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.requests import Request
-from starlette.responses import JSONResponse, StreamingResponse, Response
+from starlette.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 import uvicorn
 from dotenv import load_dotenv
 
+from mcp.server.fastmcp import FastMCP
+
 from .sonarr_client import SonarrClient, SonarrConfig
-from .server import list_tools, _execute_tool, get_client
 
 # Load environment variables
 load_dotenv()
@@ -31,39 +35,433 @@ logger = logging.getLogger(__name__)
 SERVER_NAME = "mcp-sonarr"
 SERVER_VERSION = "1.0.0"
 
+# Global client (initialized on first use)
+_client: Optional[SonarrClient] = None
+
+
+def get_client() -> SonarrClient:
+    """Get or create the Sonarr client."""
+    global _client
+    if _client is None:
+        url = os.getenv("SONARR_URL")
+        api_key = os.getenv("SONARR_API_KEY")
+
+        if not url or not api_key:
+            raise ValueError("SONARR_URL and SONARR_API_KEY environment variables are required")
+
+        config = SonarrConfig(url=url, api_key=api_key)
+        _client = SonarrClient(config)
+
+    return _client
+
 
 def get_auth_token() -> Optional[str]:
     """Get the authentication token from environment."""
     return os.getenv("MCP_AUTH_TOKEN")
 
 
-def verify_auth(request: Request) -> bool:
-    """Verify the authentication token."""
-    auth_token = get_auth_token()
-    if not auth_token:
-        return True  # No auth configured
+# ==================== Create FastMCP Server ====================
 
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        return token == auth_token
-
-    return False
+# Create FastMCP instance with JSON response mode for stateless operation
+mcp = FastMCP(
+    SERVER_NAME,
+    json_response=True,  # Enables stateless mode for better compatibility
+)
 
 
-# ==================== Endpoints ====================
+# ==================== Tool Definitions ====================
+
+
+# System Tools
+@mcp.tool()
+async def sonarr_system_status() -> dict:
+    """Get Sonarr system status including version, OS, and runtime information."""
+    client = get_client()
+    return await client.get_system_status()
+
+
+@mcp.tool()
+async def sonarr_health_check() -> list:
+    """Get health check results showing any issues with Sonarr."""
+    client = get_client()
+    return await client.get_health()
+
+
+@mcp.tool()
+async def sonarr_get_statistics() -> dict:
+    """Get comprehensive statistics about your Sonarr library including series counts, episode counts, storage usage, and queue status."""
+    client = get_client()
+    return await client.get_statistics()
+
+
+@mcp.tool()
+async def sonarr_get_disk_space() -> list:
+    """Get disk space information for all root folders."""
+    client = get_client()
+    return await client.get_disk_space()
+
+
+@mcp.tool()
+async def sonarr_get_root_folders() -> list:
+    """Get configured root folders where series are stored."""
+    client = get_client()
+    return await client.get_root_folders()
+
+
+@mcp.tool()
+async def sonarr_get_quality_profiles() -> list:
+    """Get available quality profiles for series."""
+    client = get_client()
+    return await client.get_quality_profiles()
+
+
+@mcp.tool()
+async def sonarr_get_tags() -> list:
+    """Get all tags configured in Sonarr."""
+    client = get_client()
+    return await client.get_tags()
+
+
+# Series Tools
+@mcp.tool()
+async def sonarr_get_all_series() -> list:
+    """Get all series in your Sonarr library."""
+    client = get_client()
+    series = await client.get_all_series()
+    # Return a simplified view for readability
+    return [
+        {
+            "id": s.get("id"),
+            "title": s.get("title"),
+            "year": s.get("year"),
+            "status": s.get("status"),
+            "monitored": s.get("monitored"),
+            "seasons": len(s.get("seasons", [])),
+            "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
+            "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
+            "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
+        }
+        for s in series
+    ]
+
+
+@mcp.tool()
+async def sonarr_get_series(series_id: int) -> dict:
+    """Get detailed information about a specific series by its ID.
+
+    Args:
+        series_id: The Sonarr series ID
+    """
+    client = get_client()
+    return await client.get_series(series_id)
+
+
+@mcp.tool()
+async def sonarr_search_new_series(term: str) -> list:
+    """Search for new series to add (searches TVDB/TMDB). Use this to find series before adding them.
+
+    Args:
+        term: Search term (series name or TVDB ID with 'tvdb:' prefix)
+    """
+    client = get_client()
+    results = await client.search_series(term)
+    # Return a simplified view
+    return [
+        {
+            "tvdbId": r.get("tvdbId"),
+            "title": r.get("title"),
+            "year": r.get("year"),
+            "overview": (
+                (r.get("overview", "")[:200] + "...")
+                if len(r.get("overview", "")) > 200
+                else r.get("overview", "")
+            ),
+            "status": r.get("status"),
+            "network": r.get("network"),
+            "seasons": len(r.get("seasons", [])),
+        }
+        for r in results
+    ]
+
+
+@mcp.tool()
+async def sonarr_add_series(
+    tvdb_id: int,
+    quality_profile_id: int,
+    root_folder_path: str,
+    monitored: bool = True,
+    search_for_missing: bool = True,
+) -> dict:
+    """Add a new series to Sonarr. First use sonarr_search_new_series to find the TVDB ID.
+
+    Args:
+        tvdb_id: TVDB ID of the series (get this from search results)
+        quality_profile_id: Quality profile ID (use sonarr_get_quality_profiles to see available)
+        root_folder_path: Root folder path (use sonarr_get_root_folders to see available)
+        monitored: Whether to monitor the series for new episodes (default: true)
+        search_for_missing: Whether to search for missing episodes after adding (default: true)
+    """
+    client = get_client()
+    return await client.add_series(
+        tvdb_id=tvdb_id,
+        title="",  # Will be fetched from lookup
+        quality_profile_id=quality_profile_id,
+        root_folder_path=root_folder_path,
+        monitored=monitored,
+        search_for_missing=search_for_missing,
+    )
+
+
+@mcp.tool()
+async def sonarr_delete_series(series_id: int, delete_files: bool = False) -> dict:
+    """Delete a series from Sonarr.
+
+    Args:
+        series_id: The Sonarr series ID to delete
+        delete_files: Also delete the files on disk (default: false)
+    """
+    client = get_client()
+    await client.delete_series(series_id=series_id, delete_files=delete_files)
+    return {"success": True, "message": f"Series {series_id} deleted"}
+
+
+# Episode Tools
+@mcp.tool()
+async def sonarr_get_episodes(series_id: int) -> list:
+    """Get all episodes for a specific series.
+
+    Args:
+        series_id: The Sonarr series ID
+    """
+    client = get_client()
+    episodes = await client.get_episodes(series_id)
+    return [
+        {
+            "id": e.get("id"),
+            "seasonNumber": e.get("seasonNumber"),
+            "episodeNumber": e.get("episodeNumber"),
+            "title": e.get("title"),
+            "airDate": e.get("airDate"),
+            "hasFile": e.get("hasFile"),
+            "monitored": e.get("monitored"),
+        }
+        for e in episodes
+    ]
+
+
+@mcp.tool()
+async def sonarr_get_episode_files(series_id: int) -> list:
+    """Get downloaded episode files for a series.
+
+    Args:
+        series_id: The Sonarr series ID
+    """
+    client = get_client()
+    return await client.get_episode_files(series_id)
+
+
+# Calendar Tools
+@mcp.tool()
+async def sonarr_get_calendar(days: int = 7, include_past_days: int = 0) -> list:
+    """Get upcoming episodes from the calendar.
+
+    Args:
+        days: Number of days to look ahead (default: 7)
+        include_past_days: Number of past days to include (default: 0)
+    """
+    client = get_client()
+    start_date = (datetime.now() - timedelta(days=include_past_days)).strftime("%Y-%m-%d")
+    end_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+
+    calendar = await client.get_calendar(start_date=start_date, end_date=end_date)
+    return [
+        {
+            "seriesTitle": e.get("series", {}).get("title"),
+            "seasonNumber": e.get("seasonNumber"),
+            "episodeNumber": e.get("episodeNumber"),
+            "title": e.get("title"),
+            "airDate": e.get("airDateUtc"),
+            "hasFile": e.get("hasFile"),
+        }
+        for e in calendar
+    ]
+
+
+# Queue Tools
+@mcp.tool()
+async def sonarr_get_queue(page: int = 1, page_size: int = 20) -> dict:
+    """Get the current download queue.
+
+    Args:
+        page: Page number (default: 1)
+        page_size: Items per page (default: 20)
+    """
+    client = get_client()
+    queue = await client.get_queue(page=page, page_size=page_size)
+    return {
+        "totalRecords": queue.get("totalRecords", 0),
+        "records": [
+            {
+                "id": r.get("id"),
+                "seriesTitle": r.get("series", {}).get("title"),
+                "episodeTitle": r.get("episode", {}).get("title"),
+                "seasonNumber": r.get("episode", {}).get("seasonNumber"),
+                "episodeNumber": r.get("episode", {}).get("episodeNumber"),
+                "quality": r.get("quality", {}).get("quality", {}).get("name"),
+                "size": r.get("size"),
+                "sizeleft": r.get("sizeleft"),
+                "status": r.get("status"),
+                "trackedDownloadStatus": r.get("trackedDownloadStatus"),
+                "downloadClient": r.get("downloadClient"),
+            }
+            for r in queue.get("records", [])
+        ],
+    }
+
+
+@mcp.tool()
+async def sonarr_delete_queue_item(queue_id: int, blocklist: bool = False) -> dict:
+    """Remove an item from the download queue.
+
+    Args:
+        queue_id: Queue item ID to remove
+        blocklist: Add the release to blocklist (default: false)
+    """
+    client = get_client()
+    await client.delete_queue_item(queue_id=queue_id, blocklist=blocklist)
+    return {"success": True, "message": f"Queue item {queue_id} removed"}
+
+
+# History Tools
+@mcp.tool()
+async def sonarr_get_history(page: int = 1, page_size: int = 20) -> dict:
+    """Get download history.
+
+    Args:
+        page: Page number (default: 1)
+        page_size: Items per page (default: 20)
+    """
+    client = get_client()
+    history = await client.get_history(page=page, page_size=page_size)
+    return {
+        "totalRecords": history.get("totalRecords", 0),
+        "records": [
+            {
+                "id": r.get("id"),
+                "seriesTitle": r.get("series", {}).get("title"),
+                "episodeTitle": r.get("episode", {}).get("title"),
+                "seasonNumber": r.get("episode", {}).get("seasonNumber"),
+                "episodeNumber": r.get("episode", {}).get("episodeNumber"),
+                "date": r.get("date"),
+                "eventType": r.get("eventType"),
+                "quality": r.get("quality", {}).get("quality", {}).get("name"),
+            }
+            for r in history.get("records", [])
+        ],
+    }
+
+
+# Wanted Tools
+@mcp.tool()
+async def sonarr_get_missing_episodes(page: int = 1, page_size: int = 20) -> dict:
+    """Get wanted/missing episodes.
+
+    Args:
+        page: Page number (default: 1)
+        page_size: Items per page (default: 20)
+    """
+    client = get_client()
+    missing = await client.get_wanted_missing(page=page, page_size=page_size)
+    return {
+        "totalRecords": missing.get("totalRecords", 0),
+        "records": [
+            {
+                "id": r.get("id"),
+                "seriesTitle": r.get("series", {}).get("title"),
+                "seasonNumber": r.get("seasonNumber"),
+                "episodeNumber": r.get("episodeNumber"),
+                "title": r.get("title"),
+                "airDate": r.get("airDate"),
+            }
+            for r in missing.get("records", [])
+        ],
+    }
+
+
+# Command Tools
+@mcp.tool()
+async def sonarr_search_series(series_id: int) -> dict:
+    """Trigger a search for all missing episodes of a series.
+
+    Args:
+        series_id: The Sonarr series ID to search
+    """
+    client = get_client()
+    result = await client.search_series_episodes(series_id)
+    return {"success": True, "commandId": result.get("id"), "message": "Search initiated"}
+
+
+@mcp.tool()
+async def sonarr_search_season(series_id: int, season_number: int) -> dict:
+    """Trigger a search for all episodes of a specific season.
+
+    Args:
+        series_id: The Sonarr series ID
+        season_number: Season number to search
+    """
+    client = get_client()
+    result = await client.search_season(series_id=series_id, season_number=season_number)
+    return {"success": True, "commandId": result.get("id"), "message": "Search initiated"}
+
+
+@mcp.tool()
+async def sonarr_refresh_series(series_id: Optional[int] = None) -> dict:
+    """Refresh series information from TVDB/TMDB.
+
+    Args:
+        series_id: Series ID to refresh (omit to refresh all)
+    """
+    client = get_client()
+    result = await client.refresh_series(series_id)
+    return {"success": True, "commandId": result.get("id"), "message": "Refresh initiated"}
+
+
+@mcp.tool()
+async def sonarr_rescan_series(series_id: Optional[int] = None) -> dict:
+    """Rescan disk for series files.
+
+    Args:
+        series_id: Series ID to rescan (omit to rescan all)
+    """
+    client = get_client()
+    result = await client.rescan_series(series_id)
+    return {"success": True, "commandId": result.get("id"), "message": "Rescan initiated"}
+
+
+@mcp.tool()
+async def sonarr_rss_sync() -> dict:
+    """Trigger an RSS sync to check indexers for new releases."""
+    client = get_client()
+    result = await client.rss_sync()
+    return {"success": True, "commandId": result.get("id"), "message": "RSS sync initiated"}
+
+
+# ==================== Custom Routes ====================
+
 
 async def health(request: Request) -> JSONResponse:
     """Health check endpoint."""
     try:
         client = get_client()
         status = await client.get_system_status()
-        return JSONResponse({
-            "status": "healthy",
-            "server": SERVER_NAME,
-            "version": SERVER_VERSION,
-            "sonarr_version": status.get("version"),
-        })
+        return JSONResponse(
+            {
+                "status": "healthy",
+                "server": SERVER_NAME,
+                "version": SERVER_VERSION,
+                "sonarr_version": status.get("version"),
+            }
+        )
     except Exception as e:
         return JSONResponse(
             {"status": "unhealthy", "error": str(e)},
@@ -72,303 +470,41 @@ async def health(request: Request) -> JSONResponse:
 
 
 async def server_info(request: Request) -> JSONResponse:
-    """Get server information (MCP initialize equivalent)."""
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    return JSONResponse({
-        "name": SERVER_NAME,
-        "version": SERVER_VERSION,
-        "protocolVersion": "2024-11-05",
-        "capabilities": {
-            "tools": {},
-        },
-    })
-
-
-async def tools_list(request: Request) -> JSONResponse:
-    """List available tools."""
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    tools = await list_tools()
-    return JSONResponse({
-        "tools": [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": tool.inputSchema,
-            }
-            for tool in tools
-        ]
-    })
-
-
-async def tools_call(request: Request) -> JSONResponse:
-    """Call a tool."""
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    try:
-        body = await request.json()
-        tool_name = body.get("name")
-        arguments = body.get("arguments", {})
-
-        if not tool_name:
-            return JSONResponse(
-                {"error": "Missing 'name' field"},
-                status_code=400,
-            )
-
-        client = get_client()
-        result = await _execute_tool(client, tool_name, arguments)
-
-        return JSONResponse({
-            "content": [
-                {
-                    "type": "text",
-                    "text": json.dumps(result, indent=2, default=str),
-                }
-            ],
-        })
-
-    except ValueError as e:
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=400,
-        )
-    except Exception as e:
-        logger.exception("Error calling tool")
-        return JSONResponse(
-            {"error": str(e)},
-            status_code=500,
-        )
-
-
-async def mcp_messages(request: Request) -> Response:
-    """
-    Handle MCP messages over HTTP (SSE transport).
-    This endpoint implements the Streamable HTTP transport for MCP.
-    """
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    try:
-        body = await request.json()
-        method = body.get("method")
-        params = body.get("params", {})
-        msg_id = body.get("id")
-
-        result = None
-
-        if method == "initialize":
-            result = {
-                "protocolVersion": "2024-11-05",
-                "serverInfo": {
-                    "name": SERVER_NAME,
-                    "version": SERVER_VERSION,
-                },
-                "capabilities": {
-                    "tools": {},
-                },
-            }
-
-        elif method == "tools/list":
-            tools = await list_tools()
-            result = {
-                "tools": [
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "inputSchema": tool.inputSchema,
-                    }
-                    for tool in tools
-                ]
-            }
-
-        elif method == "tools/call":
-            tool_name = params.get("name")
-            arguments = params.get("arguments", {})
-            client = get_client()
-            tool_result = await _execute_tool(client, tool_name, arguments)
-            result = {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(tool_result, indent=2, default=str),
-                    }
-                ],
-            }
-
-        elif method == "notifications/initialized":
-            # Client initialized notification - no response needed
-            return Response(status_code=204)
-
-        else:
-            return JSONResponse(
-                {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method not found: {method}",
-                    },
-                },
-                status_code=400,
-            )
-
-        return JSONResponse({
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": result,
-        })
-
-    except Exception as e:
-        logger.exception("Error processing MCP message")
-        return JSONResponse(
-            {
-                "jsonrpc": "2.0",
-                "id": body.get("id") if "body" in dir() else None,
-                "error": {
-                    "code": -32603,
-                    "message": str(e),
-                },
-            },
-            status_code=500,
-        )
-
-
-async def sse_endpoint(request: Request) -> StreamingResponse:
-    """SSE endpoint for MCP transport."""
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-
-    async def event_generator():
-        # Send initial connection event
-        yield f"data: {json.dumps({'type': 'connected', 'server': SERVER_NAME})}\n\n"
-
-        # Keep connection alive
-        while True:
-            await asyncio.sleep(30)
-            yield f"data: {json.dumps({'type': 'ping'})}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
-
-
-# OpenAPI schema for documentation
-async def openapi_schema(request: Request) -> JSONResponse:
-    """Return OpenAPI schema for the MCP server."""
-    tools = await list_tools()
-
-    paths = {
-        "/health": {
-            "get": {
-                "summary": "Health Check",
-                "description": "Check server health and Sonarr connection",
-                "responses": {"200": {"description": "Server is healthy"}},
-            }
-        },
-        "/info": {
-            "get": {
-                "summary": "Server Info",
-                "description": "Get MCP server information",
-                "responses": {"200": {"description": "Server information"}},
-            }
-        },
-        "/tools": {
-            "get": {
-                "summary": "List Tools",
-                "description": "List all available MCP tools",
-                "responses": {"200": {"description": "List of tools"}},
-            }
-        },
-        "/tools/call": {
-            "post": {
-                "summary": "Call Tool",
-                "description": "Execute an MCP tool",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "arguments": {"type": "object"},
-                                },
-                                "required": ["name"],
-                            }
-                        }
-                    }
-                },
-                "responses": {"200": {"description": "Tool execution result"}},
-            }
-        },
-        "/mcp": {
-            "post": {
-                "summary": "MCP Messages",
-                "description": "Handle MCP JSON-RPC messages",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "jsonrpc": {"type": "string"},
-                                    "method": {"type": "string"},
-                                    "params": {"type": "object"},
-                                    "id": {"type": ["string", "integer"]},
-                                },
-                            }
-                        }
-                    }
-                },
-                "responses": {"200": {"description": "MCP response"}},
-            }
-        },
-    }
-
-    return JSONResponse({
-        "openapi": "3.1.0",
-        "info": {
-            "title": "MCP Sonarr Server",
-            "description": "MCP Server for controlling Sonarr via AI assistants",
+    """Get server information."""
+    return JSONResponse(
+        {
+            "name": SERVER_NAME,
             "version": SERVER_VERSION,
-        },
-        "servers": [
-            {"url": "/", "description": "Current server"}
-        ],
-        "paths": paths,
-        "components": {
-            "securitySchemes": {
-                "bearerAuth": {
-                    "type": "http",
-                    "scheme": "bearer",
-                }
-            }
-        },
-    })
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {},
+            },
+        }
+    )
 
 
 # ==================== Application Setup ====================
 
-routes = [
-    Route("/", endpoint=server_info, methods=["GET"]),
+# Configure the MCP path to be at /mcp
+mcp.settings.streamable_http_path = "/"
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: Starlette):
+    """Manage application lifespan - initialize and cleanup MCP session manager."""
+    async with mcp.session_manager.run():
+        logger.info(f"MCP Sonarr server started - {SERVER_NAME} v{SERVER_VERSION}")
+        yield
+        logger.info("MCP Sonarr server stopping")
+
+
+# Create custom routes
+custom_routes = [
     Route("/health", endpoint=health, methods=["GET"]),
     Route("/info", endpoint=server_info, methods=["GET"]),
-    Route("/tools", endpoint=tools_list, methods=["GET"]),
-    Route("/tools/call", endpoint=tools_call, methods=["POST"]),
-    Route("/mcp", endpoint=mcp_messages, methods=["POST"]),
-    Route("/sse", endpoint=sse_endpoint, methods=["GET"]),
-    Route("/openapi.json", endpoint=openapi_schema, methods=["GET"]),
 ]
 
+# Create middleware for CORS
 middleware = [
     Middleware(
         CORSMiddleware,
@@ -379,7 +515,16 @@ middleware = [
     )
 ]
 
-app = Starlette(routes=routes, middleware=middleware)
+# Create the main application
+app = Starlette(
+    routes=[
+        *custom_routes,
+        # Mount the MCP streamable HTTP app at /mcp
+        Mount("/mcp", app=mcp.streamable_http_app()),
+    ],
+    middleware=middleware,
+    lifespan=lifespan,
+)
 
 
 def main():
@@ -388,6 +533,8 @@ def main():
     port = int(os.getenv("MCP_PORT", "8080"))
 
     logger.info(f"Starting MCP Sonarr HTTP server on {host}:{port}")
+    logger.info(f"MCP endpoint available at: http://{host}:{port}/mcp")
+    logger.info(f"Health check available at: http://{host}:{port}/health")
     uvicorn.run(app, host=host, port=port)
 
 
