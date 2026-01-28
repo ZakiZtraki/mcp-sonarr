@@ -504,7 +504,7 @@ custom_routes = [
     Route("/info", endpoint=server_info, methods=["GET"]),
 ]
 
-# Create middleware for CORS
+# Create middleware for CORS and proxy headers
 middleware = [
     Middleware(
         CORSMiddleware,
@@ -512,6 +512,7 @@ middleware = [
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
 ]
 
@@ -535,7 +536,16 @@ def main():
     logger.info(f"Starting MCP Sonarr HTTP server on {host}:{port}")
     logger.info(f"MCP endpoint available at: http://{host}:{port}/mcp")
     logger.info(f"Health check available at: http://{host}:{port}/health")
-    uvicorn.run(app, host=host, port=port)
+
+    # Run with proxy headers support for reverse proxy deployments (Traefik, nginx, etc.)
+    # This fixes 421 Misdirected Request errors when behind a reverse proxy
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        proxy_headers=True,
+        forwarded_allow_ips="*",
+    )
 
 
 if __name__ == "__main__":
