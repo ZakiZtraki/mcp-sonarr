@@ -120,14 +120,16 @@ For Claude with remote MCP server support, configure the HTTP endpoint:
 }
 ```
 
-### ChatGPT (Custom GPT)
+### ChatGPT (Native MCP Support)
 
-For ChatGPT integration, use the Actions feature with the OpenAPI schema:
+ChatGPT supports MCP servers natively. To add mcp-sonarr:
 
-1. Create a Custom GPT
-2. Add an Action with the server URL
-3. Import the OpenAPI schema from `https://your-server/openapi.json`
-4. Configure authentication (API Key with Bearer token)
+1. Deploy the HTTP server (e.g., `https://mcp-sonarr.yourdomain.com`)
+2. In ChatGPT, go to **Settings** → **Connected Apps** → **Add MCP Server**
+3. Enter the MCP endpoint URL: `https://mcp-sonarr.yourdomain.com/mcp`
+4. That's it! ChatGPT will automatically discover all available tools
+
+The `/mcp` endpoint implements the MCP Streamable HTTP transport, which ChatGPT understands natively.
 
 ## Available Tools
 
@@ -191,10 +193,12 @@ For ChatGPT integration, use the Actions feature with the OpenAPI schema:
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/info` | GET | Server information |
-| `/tools` | GET | List available tools |
-| `/tools/call` | POST | Execute a tool |
-| `/mcp` | POST | MCP JSON-RPC endpoint |
-| `/openapi.json` | GET | OpenAPI schema |
+| `/mcp` | POST | MCP Streamable HTTP endpoint (for ChatGPT/Claude) |
+
+The `/mcp` endpoint implements the full MCP protocol over HTTP, supporting:
+- `initialize` - Initialize the MCP session
+- `tools/list` - List available tools
+- `tools/call` - Execute a tool
 
 ## Example Usage
 
