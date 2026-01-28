@@ -130,12 +130,13 @@ async def sonarr_get_tags() -> list:
 
 # Series Tools
 @mcp.tool()
-async def sonarr_get_all_series() -> list:
-    """Get all series in your Sonarr library."""
+async def sonarr_get_all_series() -> dict:
+    """Get all series in your Sonarr library. Returns an object with 'items' array containing all series and 'total' count."""
     client = get_client()
     series = await client.get_all_series()
-    # Return a simplified view for readability
-    return [
+    # Return a simplified view wrapped in a structured object
+    # This ensures the response is always an object with explicit 'items' array
+    items = [
         {
             "id": s.get("id"),
             "title": s.get("title"),
@@ -146,9 +147,109 @@ async def sonarr_get_all_series() -> list:
             "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
             "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
             "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
+            "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
+            "added": s.get("added"),
         }
         for s in series
     ]
+    return {
+        "items": items,
+        "total": len(items),
+    }
+
+
+@mcp.tool()
+async def sonarr_list_series(
+    status: Optional[str] = None,
+    monitored: Optional[bool] = None,
+    title_contains: Optional[str] = None,
+    sort_by: str = "title",
+    sort_order: str = "asc",
+    page: int = 1,
+    page_size: int = 50,
+) -> dict:
+    """List series with filtering and pagination. Returns filtered results with metadata.
+
+    Args:
+        status: Filter by status: 'ended', 'continuing', 'upcoming', or 'deleted'
+        monitored: Filter by monitored status (true/false)
+        title_contains: Filter by title containing this text (case-insensitive)
+        sort_by: Sort results by field: 'title', 'year', 'added', 'sizeOnDisk' (default: title)
+        sort_order: Sort order: 'asc' or 'desc' (default: asc)
+        page: Page number (1-indexed, default: 1)
+        page_size: Items per page (default: 50, max: 500)
+    """
+    client = get_client()
+    series = await client.get_all_series()
+
+    # Build simplified series list with additional fields for filtering
+    all_items = [
+        {
+            "id": s.get("id"),
+            "title": s.get("title"),
+            "year": s.get("year"),
+            "status": s.get("status"),
+            "monitored": s.get("monitored"),
+            "seasons": len(s.get("seasons", [])),
+            "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
+            "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
+            "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
+            "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
+            "added": s.get("added"),
+        }
+        for s in series
+    ]
+
+    # Apply filters
+    filtered = all_items
+
+    # Filter by status
+    if status:
+        filtered = [s for s in filtered if s.get("status") == status]
+
+    # Filter by monitored
+    if monitored is not None:
+        filtered = [s for s in filtered if s.get("monitored") == monitored]
+
+    # Filter by title
+    if title_contains:
+        title_lower = title_contains.lower()
+        filtered = [s for s in filtered if title_lower in (s.get("title") or "").lower()]
+
+    # Sort results
+    reverse = sort_order == "desc"
+
+    if sort_by == "title":
+        filtered.sort(key=lambda x: (x.get("title") or "").lower(), reverse=reverse)
+    elif sort_by == "year":
+        filtered.sort(key=lambda x: x.get("year") or 0, reverse=reverse)
+    elif sort_by == "added":
+        filtered.sort(key=lambda x: x.get("added") or "", reverse=reverse)
+    elif sort_by == "sizeOnDisk":
+        filtered.sort(key=lambda x: x.get("sizeOnDisk") or 0, reverse=reverse)
+
+    # Pagination
+    page = max(1, page)
+    page_size = min(500, max(1, page_size))
+    total_filtered = len(filtered)
+    total_pages = (total_filtered + page_size - 1) // page_size if total_filtered > 0 else 1
+
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated = filtered[start_idx:end_idx]
+
+    return {
+        "items": paginated,
+        "total": total_filtered,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "filters_applied": {
+            "status": status,
+            "monitored": monitored,
+            "title_contains": title_contains,
+        },
+    }
 
 
 @mcp.tool()
