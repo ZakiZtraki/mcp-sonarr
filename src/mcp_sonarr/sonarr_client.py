@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class SonarrConfig(BaseModel):
     """Configuration for Sonarr connection."""
+
     url: str
     api_key: str
     timeout: float = 30.0
@@ -126,16 +127,18 @@ class SonarrClient:
             raise ValueError(f"Series with TVDB ID {tvdb_id} not found")
 
         series_data = lookup_results[0]
-        series_data.update({
-            "qualityProfileId": quality_profile_id,
-            "rootFolderPath": root_folder_path,
-            "monitored": monitored,
-            "seasonFolder": season_folder,
-            "tags": tags or [],
-            "addOptions": {
-                "searchForMissingEpisodes": search_for_missing,
-            },
-        })
+        series_data.update(
+            {
+                "qualityProfileId": quality_profile_id,
+                "rootFolderPath": root_folder_path,
+                "monitored": monitored,
+                "seasonFolder": season_folder,
+                "tags": tags or [],
+                "addOptions": {
+                    "searchForMissingEpisodes": search_for_missing,
+                },
+            }
+        )
 
         return await self._post("series", json_data=series_data)
 
@@ -358,10 +361,14 @@ class SonarrClient:
 
         total_episodes = sum(s.get("statistics", {}).get("totalEpisodeCount", 0) for s in series)
         episode_file_count = sum(s.get("statistics", {}).get("episodeFileCount", 0) for s in series)
-        missing_episodes = sum(s.get("statistics", {}).get("episodeCount", 0) - s.get("statistics", {}).get("episodeFileCount", 0) for s in series)
+        missing_episodes = sum(
+            s.get("statistics", {}).get("episodeCount", 0)
+            - s.get("statistics", {}).get("episodeFileCount", 0)
+            for s in series
+        )
 
         total_size_bytes = sum(s.get("statistics", {}).get("sizeOnDisk", 0) for s in series)
-        total_size_gb = total_size_bytes / (1024 ** 3)
+        total_size_gb = total_size_bytes / (1024**3)
 
         return {
             "series": {
@@ -375,15 +382,17 @@ class SonarrClient:
                 "total": total_episodes,
                 "downloaded": episode_file_count,
                 "missing": missing_episodes,
-                "percentage_complete": round((episode_file_count / total_episodes * 100) if total_episodes > 0 else 0, 2),
+                "percentage_complete": round(
+                    (episode_file_count / total_episodes * 100) if total_episodes > 0 else 0, 2
+                ),
             },
             "storage": {
                 "series_size_gb": round(total_size_gb, 2),
                 "disk_space": [
                     {
                         "path": d.get("path"),
-                        "free_gb": round(d.get("freeSpace", 0) / (1024 ** 3), 2),
-                        "total_gb": round(d.get("totalSpace", 0) / (1024 ** 3), 2),
+                        "free_gb": round(d.get("freeSpace", 0) / (1024**3), 2),
+                        "total_gb": round(d.get("totalSpace", 0) / (1024**3), 2),
                     }
                     for d in disk_space
                 ],

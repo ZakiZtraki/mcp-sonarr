@@ -32,9 +32,7 @@ def get_client() -> SonarrClient:
         api_key = os.getenv("SONARR_API_KEY")
 
         if not url or not api_key:
-            raise ValueError(
-                "SONARR_URL and SONARR_API_KEY environment variables are required"
-            )
+            raise ValueError("SONARR_URL and SONARR_API_KEY environment variables are required")
 
         config = SonarrConfig(url=url, api_key=api_key)
         _client = SonarrClient(config)
@@ -48,6 +46,7 @@ def format_response(data: any) -> str:
 
 
 # ==================== Tool Definitions ====================
+
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
@@ -117,14 +116,58 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
-
         # Series Tools
         Tool(
             name="sonarr_get_all_series",
-            description="Get all series in your Sonarr library",
+            description="Get all series in your Sonarr library. Returns an object with 'items' array containing all series and 'total' count.",
             inputSchema={
                 "type": "object",
                 "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
+            name="sonarr_list_series",
+            description="List series with filtering and pagination. Returns filtered results with metadata.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by status: 'ended', 'continuing', 'upcoming', or 'deleted'",
+                        "enum": ["ended", "continuing", "upcoming", "deleted"],
+                    },
+                    "monitored": {
+                        "type": "boolean",
+                        "description": "Filter by monitored status (true/false)",
+                    },
+                    "title_contains": {
+                        "type": "string",
+                        "description": "Filter by title containing this text (case-insensitive)",
+                    },
+                    "sort_by": {
+                        "type": "string",
+                        "description": "Sort results by field",
+                        "enum": ["title", "year", "added", "sizeOnDisk"],
+                        "default": "title",
+                    },
+                    "sort_order": {
+                        "type": "string",
+                        "description": "Sort order: 'asc' or 'desc'",
+                        "enum": ["asc", "desc"],
+                        "default": "asc",
+                    },
+                    "page": {
+                        "type": "integer",
+                        "description": "Page number (1-indexed, default: 1)",
+                        "default": 1,
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "description": "Items per page (default: 50, max: 500)",
+                        "default": 50,
+                    },
+                },
                 "required": [],
             },
         ),
@@ -207,7 +250,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["series_id"],
             },
         ),
-
         # Episode Tools
         Tool(
             name="sonarr_get_episodes",
@@ -237,7 +279,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["series_id"],
             },
         ),
-
         # Calendar Tools
         Tool(
             name="sonarr_get_calendar",
@@ -259,7 +300,6 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
-
         # Queue Tools
         Tool(
             name="sonarr_get_queue",
@@ -300,7 +340,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["queue_id"],
             },
         ),
-
         # History Tools
         Tool(
             name="sonarr_get_history",
@@ -322,7 +361,6 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
-
         # Wanted Tools
         Tool(
             name="sonarr_get_missing_episodes",
@@ -344,7 +382,6 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
-
         # Command Tools
         Tool(
             name="sonarr_search_series",
@@ -420,6 +457,7 @@ async def list_tools() -> list[Tool]:
 
 # ==================== Tool Handlers ====================
 
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Handle tool calls."""
@@ -460,8 +498,9 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
     # Series Tools
     elif name == "sonarr_get_all_series":
         series = await client.get_all_series()
-        # Return a simplified view for readability
-        return [
+        # Return a simplified view wrapped in a structured object
+        # This ensures the response is always an object with explicit 'items' array
+        items = [
             {
                 "id": s.get("id"),
                 "title": s.get("title"),
@@ -472,9 +511,92 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
                 "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
                 "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
                 "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
+                "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
+                "added": s.get("added"),
             }
             for s in series
         ]
+        return {
+            "items": items,
+            "total": len(items),
+        }
+
+    elif name == "sonarr_list_series":
+        series = await client.get_all_series()
+
+        # Build simplified series list with additional fields for filtering
+        all_items = [
+            {
+                "id": s.get("id"),
+                "title": s.get("title"),
+                "year": s.get("year"),
+                "status": s.get("status"),
+                "monitored": s.get("monitored"),
+                "seasons": len(s.get("seasons", [])),
+                "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
+                "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
+                "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
+                "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
+                "added": s.get("added"),
+            }
+            for s in series
+        ]
+
+        # Apply filters
+        filtered = all_items
+
+        # Filter by status
+        status_filter = arguments.get("status")
+        if status_filter:
+            filtered = [s for s in filtered if s.get("status") == status_filter]
+
+        # Filter by monitored
+        monitored_filter = arguments.get("monitored")
+        if monitored_filter is not None:
+            filtered = [s for s in filtered if s.get("monitored") == monitored_filter]
+
+        # Filter by title
+        title_filter = arguments.get("title_contains")
+        if title_filter:
+            title_lower = title_filter.lower()
+            filtered = [s for s in filtered if title_lower in (s.get("title") or "").lower()]
+
+        # Sort results
+        sort_by = arguments.get("sort_by", "title")
+        sort_order = arguments.get("sort_order", "asc")
+        reverse = sort_order == "desc"
+
+        if sort_by == "title":
+            filtered.sort(key=lambda x: (x.get("title") or "").lower(), reverse=reverse)
+        elif sort_by == "year":
+            filtered.sort(key=lambda x: x.get("year") or 0, reverse=reverse)
+        elif sort_by == "added":
+            filtered.sort(key=lambda x: x.get("added") or "", reverse=reverse)
+        elif sort_by == "sizeOnDisk":
+            filtered.sort(key=lambda x: x.get("sizeOnDisk") or 0, reverse=reverse)
+
+        # Pagination
+        page = max(1, arguments.get("page", 1))
+        page_size = min(500, max(1, arguments.get("page_size", 50)))
+        total_filtered = len(filtered)
+        total_pages = (total_filtered + page_size - 1) // page_size if total_filtered > 0 else 1
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated = filtered[start_idx:end_idx]
+
+        return {
+            "items": paginated,
+            "total": total_filtered,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "filters_applied": {
+                "status": status_filter,
+                "monitored": monitored_filter,
+                "title_contains": title_filter,
+            },
+        }
 
     elif name == "sonarr_get_series":
         return await client.get_series(arguments["series_id"])
@@ -487,7 +609,11 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
                 "tvdbId": r.get("tvdbId"),
                 "title": r.get("title"),
                 "year": r.get("year"),
-                "overview": r.get("overview", "")[:200] + "..." if len(r.get("overview", "")) > 200 else r.get("overview", ""),
+                "overview": (
+                    r.get("overview", "")[:200] + "..."
+                    if len(r.get("overview", "")) > 200
+                    else r.get("overview", "")
+                ),
                 "status": r.get("status"),
                 "network": r.get("network"),
                 "seasons": len(r.get("seasons", [])),
@@ -659,7 +785,6 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
 
 def main():
     """Main entry point for the MCP server."""
-    import sys
 
     async def run():
         async with stdio_server() as (read_stream, write_stream):
