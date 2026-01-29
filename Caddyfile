@@ -240,98 +240,72 @@
 	}
 
 	# ==========================================================================
-	# REVERSE PROXY CONFIGURATION
+	# CHATGPT MCP CLIENT AUTHENTICATION
 	# ==========================================================================
-	# This is the main proxy configuration for the MCP Sonarr server
+	# Only allow requests from ChatGPT MCP clients with valid token
+	# Set X_MCP_TOKEN environment variable with your secret token
+	#
+	# This matcher requires BOTH:
+	# - User-Agent: openai-mcp/1.0.0 (ChatGPT's MCP client identifier)
+	# - X-MCP-Token: your secret token (additional authentication layer)
 
-	reverse_proxy mcp-sonarr:8080 {
-		# ======================================================================
-		# UPSTREAM CONFIGURATION
-		# ======================================================================
+	@chatgpt_mcp {
+		header User-Agent openai-mcp/1.0.0
+		header X-MCP-Token {$X_MCP_TOKEN:your-secret-token-here}
+	}
 
-		# Health checks for the upstream server
-		health_uri /health
-		health_interval 30s
-		health_timeout 10s
-		health_status 200
+	# ==========================================================================
+	# REVERSE PROXY CONFIGURATION (for authenticated ChatGPT MCP clients)
+	# ==========================================================================
 
-		# ======================================================================
-		# LOAD BALANCING (for multiple backends)
-		# ======================================================================
-		# Uncomment if running multiple MCP server instances
+	handle @chatgpt_mcp {
+		reverse_proxy mcp-sonarr:8080 {
+			# ==================================================================
+			# UPSTREAM CONFIGURATION
+			# ==================================================================
 
-		# Load balancing policy: round_robin, least_conn, random, first, ip_hash, uri_hash, header, cookie
-		# lb_policy round_robin
+			# Health checks for the upstream server
+			health_uri /health
+			health_interval 30s
+			health_timeout 10s
+			health_status 200
 
-		# Additional backends for load balancing
-		# to mcp-sonarr-2:8080
-		# to mcp-sonarr-3:8080
+			# ==================================================================
+			# TIMEOUTS
+			# ==================================================================
 
-		# Sticky sessions (useful for stateful applications)
-		# lb_policy cookie mcp_session
+			transport http {
+				dial_timeout 30s
+				keepalive 30s
+				keepalive_idle_conns 10
+				response_header_timeout 60s
+			}
 
-		# ======================================================================
-		# TIMEOUTS
-		# ======================================================================
-		# Adjust based on expected request duration
+			# ==================================================================
+			# HEADER MANIPULATION
+			# ==================================================================
 
-		# Time to establish connection to upstream
-		transport http {
-			dial_timeout 30s
+			# Pass original client information to the backend
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port {server_port}
 
-			# Keep-alive settings
-			keepalive 30s
-			keepalive_idle_conns 10
-
-			# Response header timeout
-			response_header_timeout 60s
-
-			# TLS configuration for upstream (if using HTTPS to backend)
-			# tls
-			# tls_insecure_skip_verify  # Not recommended - only for self-signed certs
+			# Remove sensitive headers from responses
+			header_down -X-Powered-By
+			header_down -Server
 		}
+	}
 
-		# ======================================================================
-		# HEADER MANIPULATION
-		# ======================================================================
+	# ==========================================================================
+	# BLOCK ALL OTHER REQUESTS
+	# ==========================================================================
+	# Any request that doesn't match the ChatGPT MCP client criteria gets 403
 
-		# Pass original client information to the backend
-		header_up Host {host}
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
-		header_up X-Forwarded-Port {server_port}
-
-		# Remove sensitive headers from responses
-		header_down -X-Powered-By
-		header_down -Server
-
-		# ======================================================================
-		# BUFFERING AND STREAMING
-		# ======================================================================
-		# Configure based on your response characteristics
-
-		# Disable response buffering for streaming responses
-		# flush_interval -1
-
-		# Enable buffering with specific size
-		# buffer_responses
-		# buffer_requests
-
-		# ======================================================================
-		# ERROR HANDLING
-		# ======================================================================
-		# Handle upstream errors gracefully
-
-		# Retry failed requests on other backends (if multiple backends configured)
-		# lb_try_duration 30s
-		# lb_try_interval 1s
-
-		# Custom error handling
-		# handle_response @error {
-		# 	respond "Service temporarily unavailable" 503
-		# }
+	handle {
+		respond "Forbidden" 403
 	}
 
 	# ==========================================================================
