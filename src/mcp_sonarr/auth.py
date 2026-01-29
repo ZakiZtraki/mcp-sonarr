@@ -566,6 +566,7 @@ class OAuthMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {
         "/health",
         "/info",
+        "/debug/series",
         "/oauth/authorize",
         "/oauth/token",
         "/.well-known/oauth-authorization-server",

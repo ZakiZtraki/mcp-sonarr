@@ -171,24 +171,32 @@ async def sonarr_get_all_series(include_stats: bool = True) -> dict:
     """
     client = get_client()
     series = await client.get_all_series()
+    logger.debug(f"sonarr_get_all_series: Retrieved {len(series)} series from Sonarr")
+
     # Return a simplified view wrapped in a structured object
     # This ensures the response is always an object with explicit 'items' array
-    items = [
-        {
-            "id": s.get("id"),
-            "title": s.get("title"),
-            "year": s.get("year"),
-            "status": s.get("status"),
-            "monitored": s.get("monitored"),
-            "seasons": len(s.get("seasons", [])),
-            "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
-            "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
-            "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
-            "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
-            "added": s.get("added"),
-        }
-        for s in series
-    ]
+    # Use (x or {}) to handle both missing keys AND null values from Sonarr API
+    items = []
+    for s in series:
+        stats = s.get("statistics") or {}
+        seasons = s.get("seasons") or []
+        items.append(
+            {
+                "id": s.get("id"),
+                "title": s.get("title"),
+                "year": s.get("year"),
+                "status": s.get("status"),
+                "monitored": s.get("monitored"),
+                "seasons": len(seasons),
+                "episodeCount": stats.get("episodeCount", 0),
+                "episodeFileCount": stats.get("episodeFileCount", 0),
+                "percentComplete": stats.get("percentOfEpisodes", 0),
+                "sizeOnDisk": stats.get("sizeOnDisk", 0),
+                "added": s.get("added"),
+            }
+        )
+
+    logger.debug(f"sonarr_get_all_series: Returning {len(items)} items")
     return {
         "items": items,
         "total": len(items),
@@ -220,22 +228,26 @@ async def sonarr_list_series(
     series = await client.get_all_series()
 
     # Build simplified series list with additional fields for filtering
-    all_items = [
-        {
-            "id": s.get("id"),
-            "title": s.get("title"),
-            "year": s.get("year"),
-            "status": s.get("status"),
-            "monitored": s.get("monitored"),
-            "seasons": len(s.get("seasons", [])),
-            "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
-            "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
-            "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
-            "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
-            "added": s.get("added"),
-        }
-        for s in series
-    ]
+    # Use (x or {}) to handle both missing keys AND null values from Sonarr API
+    all_items = []
+    for s in series:
+        stats = s.get("statistics") or {}
+        seasons = s.get("seasons") or []
+        all_items.append(
+            {
+                "id": s.get("id"),
+                "title": s.get("title"),
+                "year": s.get("year"),
+                "status": s.get("status"),
+                "monitored": s.get("monitored"),
+                "seasons": len(seasons),
+                "episodeCount": stats.get("episodeCount", 0),
+                "episodeFileCount": stats.get("episodeFileCount", 0),
+                "percentComplete": stats.get("percentOfEpisodes", 0),
+                "sizeOnDisk": stats.get("sizeOnDisk", 0),
+                "added": s.get("added"),
+            }
+        )
 
     # Apply filters
     filtered = all_items
@@ -621,6 +633,51 @@ async def health(request: Request) -> JSONResponse:
         )
 
 
+async def debug_series(request: Request) -> JSONResponse:
+    """Debug endpoint to test series retrieval directly (bypasses MCP protocol).
+
+    This helps diagnose whether issues are with data transformation or MCP transport.
+    """
+    try:
+        client = get_client()
+        series = await client.get_all_series()
+
+        # Transform just like the MCP tool does
+        items = []
+        for s in series:
+            stats = s.get("statistics") or {}
+            seasons = s.get("seasons") or []
+            items.append(
+                {
+                    "id": s.get("id"),
+                    "title": s.get("title"),
+                    "year": s.get("year"),
+                    "status": s.get("status"),
+                    "monitored": s.get("monitored"),
+                    "seasons": len(seasons),
+                    "episodeCount": stats.get("episodeCount", 0),
+                    "episodeFileCount": stats.get("episodeFileCount", 0),
+                    "percentComplete": stats.get("percentOfEpisodes", 0),
+                    "sizeOnDisk": stats.get("sizeOnDisk", 0),
+                    "added": s.get("added"),
+                }
+            )
+
+        result = {
+            "items": items,
+            "total": len(items),
+        }
+
+        logger.info(f"debug_series: Returning {len(items)} series")
+        return JSONResponse(result)
+    except Exception as e:
+        logger.exception("debug_series: Error retrieving series")
+        return JSONResponse(
+            {"error": str(e), "type": type(e).__name__},
+            status_code=500,
+        )
+
+
 async def server_info(request: Request) -> JSONResponse:
     """Get server information."""
     return JSONResponse(
@@ -654,6 +711,7 @@ async def lifespan(app: Starlette):
 custom_routes = [
     Route("/health", endpoint=health, methods=["GET"]),
     Route("/info", endpoint=server_info, methods=["GET"]),
+    Route("/debug/series", endpoint=debug_series, methods=["GET"]),
     # OAuth 2.0 endpoints
     Route("/oauth/authorize", endpoint=oauth_authorize, methods=["GET", "POST"]),
     Route("/oauth/token", endpoint=oauth_token, methods=["POST"]),

@@ -500,22 +500,26 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
         series = await client.get_all_series()
         # Return a simplified view wrapped in a structured object
         # This ensures the response is always an object with explicit 'items' array
-        items = [
-            {
-                "id": s.get("id"),
-                "title": s.get("title"),
-                "year": s.get("year"),
-                "status": s.get("status"),
-                "monitored": s.get("monitored"),
-                "seasons": len(s.get("seasons", [])),
-                "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
-                "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
-                "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
-                "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
-                "added": s.get("added"),
-            }
-            for s in series
-        ]
+        # Use (x or {}) to handle both missing keys AND null values from Sonarr API
+        items = []
+        for s in series:
+            stats = s.get("statistics") or {}
+            seasons = s.get("seasons") or []
+            items.append(
+                {
+                    "id": s.get("id"),
+                    "title": s.get("title"),
+                    "year": s.get("year"),
+                    "status": s.get("status"),
+                    "monitored": s.get("monitored"),
+                    "seasons": len(seasons),
+                    "episodeCount": stats.get("episodeCount", 0),
+                    "episodeFileCount": stats.get("episodeFileCount", 0),
+                    "percentComplete": stats.get("percentOfEpisodes", 0),
+                    "sizeOnDisk": stats.get("sizeOnDisk", 0),
+                    "added": s.get("added"),
+                }
+            )
         return {
             "items": items,
             "total": len(items),
@@ -525,22 +529,26 @@ async def _execute_tool(client: SonarrClient, name: str, arguments: dict) -> any
         series = await client.get_all_series()
 
         # Build simplified series list with additional fields for filtering
-        all_items = [
-            {
-                "id": s.get("id"),
-                "title": s.get("title"),
-                "year": s.get("year"),
-                "status": s.get("status"),
-                "monitored": s.get("monitored"),
-                "seasons": len(s.get("seasons", [])),
-                "episodeCount": s.get("statistics", {}).get("episodeCount", 0),
-                "episodeFileCount": s.get("statistics", {}).get("episodeFileCount", 0),
-                "percentComplete": s.get("statistics", {}).get("percentOfEpisodes", 0),
-                "sizeOnDisk": s.get("statistics", {}).get("sizeOnDisk", 0),
-                "added": s.get("added"),
-            }
-            for s in series
-        ]
+        # Use (x or {}) to handle both missing keys AND null values from Sonarr API
+        all_items = []
+        for s in series:
+            stats = s.get("statistics") or {}
+            seasons = s.get("seasons") or []
+            all_items.append(
+                {
+                    "id": s.get("id"),
+                    "title": s.get("title"),
+                    "year": s.get("year"),
+                    "status": s.get("status"),
+                    "monitored": s.get("monitored"),
+                    "seasons": len(seasons),
+                    "episodeCount": stats.get("episodeCount", 0),
+                    "episodeFileCount": stats.get("episodeFileCount", 0),
+                    "percentComplete": stats.get("percentOfEpisodes", 0),
+                    "sizeOnDisk": stats.get("sizeOnDisk", 0),
+                    "added": s.get("added"),
+                }
+            )
 
         # Apply filters
         filtered = all_items
