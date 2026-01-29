@@ -1,3 +1,15 @@
+# =============================================================================
+# Docker Compose with Caddy Reverse Proxy
+# =============================================================================
+# Use this file for deployments that include the Caddy reverse proxy.
+# In Portainer, set the Compose path to: docker-compose.caddy.yml
+#
+# Required environment variables:
+#   - SONARR_API_KEY: Your Sonarr API key
+#   - MCP_DOMAIN: Your domain name (e.g., mcp-sonarr.example.com)
+#   - ACME_EMAIL: Email for Let's Encrypt notifications
+# =============================================================================
+
 services:
   mcp-sonarr:
     build:
@@ -5,10 +17,9 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-sonarr
     restart: unless-stopped
-    # When using Caddy, we don't expose ports directly - Caddy handles external access
-    # Comment out the ports section below when using the caddy profile
-    ports:
-      - "8090:8080"
+    # No external ports - Caddy handles all external traffic
+    expose:
+      - "8080"
     environment:
       # Required: Your Sonarr instance URL
       - SONARR_URL=${SONARR_URL:-https://sonarr.zenmedia.live}
@@ -31,28 +42,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # Optional: Add labels for reverse proxy (Traefik example)
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mcp-sonarr.rule=Host(`mcp-sonarr.yourdomain.com`)"
-      - "traefik.http.routers.mcp-sonarr.entrypoints=websecure"
-      - "traefik.http.routers.mcp-sonarr.tls.certresolver=letsencrypt"
-      - "traefik.http.services.mcp-sonarr.loadbalancer.server.port=8080"
     networks:
       - mcp-network
 
-  # =============================================================================
-  # OPTIONAL: Caddy Reverse Proxy
-  # =============================================================================
-  # Enable with: docker-compose --profile caddy up -d
-  # Or set COMPOSE_PROFILES=caddy in your environment
-  # =============================================================================
   caddy:
     image: caddy:2-alpine
     container_name: mcp-caddy
     restart: unless-stopped
-    profiles:
-      - caddy
     ports:
       # HTTP port - used for ACME challenges and HTTP->HTTPS redirect
       - "80:80"
