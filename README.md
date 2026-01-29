@@ -78,9 +78,19 @@ mcp-sonarr
 |----------|----------|-------------|
 | `SONARR_URL` | Yes | URL of your Sonarr instance |
 | `SONARR_API_KEY` | Yes | Sonarr API key (Settings -> General -> API Key) |
-| `MCP_AUTH_TOKEN` | No | Bearer token for API authentication |
+| `MCP_AUTH_TOKEN` | No | Simple Bearer token for API authentication |
 | `MCP_HOST` | No | Server host (default: `0.0.0.0`) |
 | `MCP_PORT` | No | Server port (default: `8080`) |
+
+#### OAuth 2.0 Configuration (for ChatGPT)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OAUTH_CLIENT_ID` | For OAuth | OAuth client ID (provide to ChatGPT) |
+| `OAUTH_CLIENT_SECRET` | For OAuth | OAuth client secret (provide to ChatGPT) |
+| `OAUTH_AUTH_PASSWORD` | For OAuth | Password for the authorization form |
+| `OAUTH_JWT_SECRET` | No | Secret for signing JWTs (auto-generated if not set) |
+| `OAUTH_ACCESS_TOKEN_EXPIRE_MINUTES` | No | Token expiry in minutes (default: `60`) |
 
 ## Integration with AI Assistants
 
@@ -120,16 +130,54 @@ For Claude with remote MCP server support, configure the HTTP endpoint:
 }
 ```
 
-### ChatGPT (Native MCP Support)
+### ChatGPT (with OAuth Authentication)
 
-ChatGPT supports MCP servers natively. To add mcp-sonarr:
+ChatGPT supports OAuth 2.0 for authenticating with MCP servers. Here's how to set it up:
 
-1. Deploy the HTTP server (e.g., `https://mcp-sonarr.yourdomain.com`)
-2. In ChatGPT, go to **Settings** → **Connected Apps** → **Add MCP Server**
-3. Enter the MCP endpoint URL: `https://mcp-sonarr.yourdomain.com/mcp`
-4. That's it! ChatGPT will automatically discover all available tools
+#### 1. Configure OAuth on Your Server
 
-The `/mcp` endpoint implements the MCP Streamable HTTP transport, which ChatGPT understands natively.
+Set these environment variables on your MCP server:
+
+```env
+# Generate secure values for these
+OAUTH_CLIENT_ID=my-chatgpt-client
+OAUTH_CLIENT_SECRET=your-super-secret-value-here
+OAUTH_AUTH_PASSWORD=your-authorization-password
+```
+
+#### 2. Configure ChatGPT Custom Action
+
+In ChatGPT, create a new GPT or edit an existing one:
+
+1. Go to **Configure** → **Actions** → **Create new action**
+2. Set the **Authentication** type to **OAuth**
+3. Enter the following OAuth settings:
+   - **Client ID**: Your `OAUTH_CLIENT_ID` value
+   - **Client Secret**: Your `OAUTH_CLIENT_SECRET` value
+   - **Authorization URL**: `https://your-mcp-server.com/oauth/authorize`
+   - **Token URL**: `https://your-mcp-server.com/oauth/token`
+   - **Scope**: `full` (or leave empty)
+
+4. Import the OpenAPI schema from your server, or manually configure the MCP endpoint:
+   - **Server URL**: `https://your-mcp-server.com`
+
+#### 3. Authorize Access
+
+When ChatGPT tries to use your MCP server for the first time:
+1. You'll be redirected to the authorization page
+2. Enter your `OAUTH_AUTH_PASSWORD`
+3. Click **Authorize**
+4. ChatGPT will receive an access token and can now call your MCP tools
+
+The OAuth flow follows the standard Authorization Code grant type, which ChatGPT handles automatically.
+
+### ChatGPT (Simple Bearer Token)
+
+For simpler setups without OAuth, you can use a Bearer token:
+
+1. Set `MCP_AUTH_TOKEN=your-secure-token` on your server
+2. In ChatGPT, configure the action with **API Key** authentication
+3. Set the header to `Authorization: Bearer your-secure-token`
 
 ## Available Tools
 
@@ -194,6 +242,9 @@ The `/mcp` endpoint implements the MCP Streamable HTTP transport, which ChatGPT 
 | `/health` | GET | Health check |
 | `/info` | GET | Server information |
 | `/mcp` | POST | MCP Streamable HTTP endpoint (for ChatGPT/Claude) |
+| `/oauth/authorize` | GET, POST | OAuth 2.0 authorization endpoint |
+| `/oauth/token` | POST | OAuth 2.0 token endpoint |
+| `/.well-known/oauth-authorization-server` | GET | OAuth 2.0 server metadata |
 
 The `/mcp` endpoint implements the full MCP protocol over HTTP, supporting:
 - `initialize` - Initialize the MCP session
@@ -230,9 +281,11 @@ The `/mcp` endpoint implements the full MCP protocol over HTTP, supporting:
 ## Security Considerations
 
 1. **Use HTTPS**: Always deploy behind a reverse proxy with TLS
-2. **Set Auth Token**: Configure `MCP_AUTH_TOKEN` for production
-3. **Firewall**: Limit access to trusted networks/IPs
-4. **API Key Security**: Never expose your Sonarr API key publicly
+2. **Enable Authentication**: Use OAuth (`OAUTH_*` variables) or simple Bearer token (`MCP_AUTH_TOKEN`)
+3. **Strong Secrets**: Use long, random values for `OAUTH_CLIENT_SECRET` and `OAUTH_AUTH_PASSWORD`
+4. **Firewall**: Limit access to trusted networks/IPs
+5. **API Key Security**: Never expose your Sonarr API key publicly
+6. **Token Expiry**: Adjust `OAUTH_ACCESS_TOKEN_EXPIRE_MINUTES` based on your security requirements
 
 ## Deployment with Traefik
 
@@ -291,7 +344,8 @@ mcp-sonarr/
 │       ├── __init__.py
 │       ├── server.py        # MCP server (stdio transport)
 │       ├── http_server.py   # HTTP server (remote access)
-│       └── sonarr_client.py # Sonarr API client
+│       ├── sonarr_client.py # Sonarr API client
+│       └── auth.py          # OAuth 2.0 authentication
 ├── tests/
 ├── Dockerfile
 ├── docker-compose.yml
