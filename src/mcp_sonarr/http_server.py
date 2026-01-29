@@ -95,8 +95,12 @@ async def sonarr_system_status() -> dict:
 
 
 @mcp.tool()
-async def sonarr_health_check() -> dict:
-    """Get health check results showing any issues with Sonarr."""
+async def sonarr_health_check(include_details: bool = True) -> dict:
+    """Get health check results showing any issues with Sonarr.
+
+    Args:
+        include_details: Include detailed health information (default: true)
+    """
     client = get_client()
     items = await client.get_health()
     return {"items": items, "total": len(items)}
@@ -110,32 +114,48 @@ async def sonarr_get_statistics() -> dict:
 
 
 @mcp.tool()
-async def sonarr_get_disk_space() -> dict:
-    """Get disk space information for all root folders."""
+async def sonarr_get_disk_space(include_details: bool = True) -> dict:
+    """Get disk space information for all root folders.
+
+    Args:
+        include_details: Include detailed disk information (default: true)
+    """
     client = get_client()
     items = await client.get_disk_space()
     return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_root_folders() -> dict:
-    """Get configured root folders where series are stored."""
+async def sonarr_get_root_folders(include_details: bool = True) -> dict:
+    """Get configured root folders where series are stored.
+
+    Args:
+        include_details: Include detailed folder information (default: true)
+    """
     client = get_client()
     items = await client.get_root_folders()
     return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_quality_profiles() -> dict:
-    """Get available quality profiles for series."""
+async def sonarr_get_quality_profiles(include_details: bool = True) -> dict:
+    """Get available quality profiles for series.
+
+    Args:
+        include_details: Include detailed profile information (default: true)
+    """
     client = get_client()
     items = await client.get_quality_profiles()
     return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_tags() -> dict:
-    """Get all tags configured in Sonarr."""
+async def sonarr_get_tags(include_details: bool = True) -> dict:
+    """Get all tags configured in Sonarr.
+
+    Args:
+        include_details: Include detailed tag information (default: true)
+    """
     client = get_client()
     items = await client.get_tags()
     return {"items": items, "total": len(items)}
@@ -143,8 +163,12 @@ async def sonarr_get_tags() -> dict:
 
 # Series Tools
 @mcp.tool()
-async def sonarr_get_all_series() -> dict:
-    """Get all series in your Sonarr library. Returns an object with 'items' array containing all series and 'total' count."""
+async def sonarr_get_all_series(include_stats: bool = True) -> dict:
+    """Get all series in your Sonarr library. Returns an object with 'items' array containing all series and 'total' count.
+
+    Args:
+        include_stats: Include statistics for each series (default: true)
+    """
     client = get_client()
     series = await client.get_all_series()
     # Return a simplified view wrapped in a structured object
@@ -563,8 +587,12 @@ async def sonarr_rescan_series(series_id: Optional[int] = None) -> dict:
 
 
 @mcp.tool()
-async def sonarr_rss_sync() -> dict:
-    """Trigger an RSS sync to check indexers for new releases."""
+async def sonarr_rss_sync(force: bool = False) -> dict:
+    """Trigger an RSS sync to check indexers for new releases.
+
+    Args:
+        force: Force the sync even if one is already running (default: false)
+    """
     client = get_client()
     result = await client.rss_sync()
     return {"success": True, "commandId": result.get("id"), "message": "RSS sync initiated"}
