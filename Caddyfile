@@ -240,72 +240,49 @@
 	}
 
 	# ==========================================================================
-	# CHATGPT MCP CLIENT AUTHENTICATION
+	# REVERSE PROXY CONFIGURATION
 	# ==========================================================================
-	# Only allow requests from ChatGPT MCP clients with valid token
-	# Set X_MCP_TOKEN environment variable with your secret token
-	#
-	# This matcher requires BOTH:
-	# - User-Agent: openai-mcp/1.0.0 (ChatGPT's MCP client identifier)
-	# - X-MCP-Token: your secret token (additional authentication layer)
+	# Proxy all requests to the MCP Sonarr server
+	# Authentication is handled by the application via OAuth 2.0
+	# (Configure OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_AUTH_PASSWORD)
 
-	@chatgpt_mcp {
-		header User-Agent openai-mcp/1.0.0
-		header X-MCP-Token {$X_MCP_TOKEN:your-secret-token-here}
-	}
+	reverse_proxy mcp-sonarr:8080 {
+		# ======================================================================
+		# UPSTREAM CONFIGURATION
+		# ======================================================================
 
-	# ==========================================================================
-	# REVERSE PROXY CONFIGURATION (for authenticated ChatGPT MCP clients)
-	# ==========================================================================
+		# Health checks for the upstream server
+		health_uri /health
+		health_interval 30s
+		health_timeout 10s
+		health_status 200
 
-	handle @chatgpt_mcp {
-		reverse_proxy mcp-sonarr:8080 {
-			# ==================================================================
-			# UPSTREAM CONFIGURATION
-			# ==================================================================
+		# ======================================================================
+		# TIMEOUTS
+		# ======================================================================
 
-			# Health checks for the upstream server
-			health_uri /health
-			health_interval 30s
-			health_timeout 10s
-			health_status 200
-
-			# ==================================================================
-			# TIMEOUTS
-			# ==================================================================
-
-			transport http {
-				dial_timeout 30s
-				keepalive 30s
-				keepalive_idle_conns 10
-				response_header_timeout 60s
-			}
-
-			# ==================================================================
-			# HEADER MANIPULATION
-			# ==================================================================
-
-			# Pass original client information to the backend
-			header_up Host {host}
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Forwarded-Host {host}
-			header_up X-Forwarded-Port {server_port}
-
-			# Remove sensitive headers from responses
-			header_down -X-Powered-By
-			header_down -Server
+		transport http {
+			dial_timeout 30s
+			keepalive 30s
+			keepalive_idle_conns 10
+			response_header_timeout 60s
 		}
-	}
 
-	# ==========================================================================
-	# BLOCK ALL OTHER REQUESTS
-	# ==========================================================================
-	# Any request that doesn't match the ChatGPT MCP client criteria gets 403
+		# ======================================================================
+		# HEADER MANIPULATION
+		# ======================================================================
 
-	handle {
-		respond "Forbidden" 403
+		# Pass original client information to the backend
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Port {server_port}
+
+		# Remove sensitive headers from responses
+		header_down -X-Powered-By
+		header_down -Server
 	}
 
 	# ==========================================================================
