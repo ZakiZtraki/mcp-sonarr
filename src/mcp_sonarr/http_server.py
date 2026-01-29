@@ -95,10 +95,11 @@ async def sonarr_system_status() -> dict:
 
 
 @mcp.tool()
-async def sonarr_health_check() -> list:
+async def sonarr_health_check() -> dict:
     """Get health check results showing any issues with Sonarr."""
     client = get_client()
-    return await client.get_health()
+    items = await client.get_health()
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
@@ -109,31 +110,35 @@ async def sonarr_get_statistics() -> dict:
 
 
 @mcp.tool()
-async def sonarr_get_disk_space() -> list:
+async def sonarr_get_disk_space() -> dict:
     """Get disk space information for all root folders."""
     client = get_client()
-    return await client.get_disk_space()
+    items = await client.get_disk_space()
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_root_folders() -> list:
+async def sonarr_get_root_folders() -> dict:
     """Get configured root folders where series are stored."""
     client = get_client()
-    return await client.get_root_folders()
+    items = await client.get_root_folders()
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_quality_profiles() -> list:
+async def sonarr_get_quality_profiles() -> dict:
     """Get available quality profiles for series."""
     client = get_client()
-    return await client.get_quality_profiles()
+    items = await client.get_quality_profiles()
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_tags() -> list:
+async def sonarr_get_tags() -> dict:
     """Get all tags configured in Sonarr."""
     client = get_client()
-    return await client.get_tags()
+    items = await client.get_tags()
+    return {"items": items, "total": len(items)}
 
 
 # Series Tools
@@ -272,7 +277,7 @@ async def sonarr_get_series(series_id: int) -> dict:
 
 
 @mcp.tool()
-async def sonarr_search_new_series(term: str) -> list:
+async def sonarr_search_new_series(term: str) -> dict:
     """Search for new series to add (searches TVDB/TMDB). Use this to find series before adding them.
 
     Args:
@@ -281,7 +286,7 @@ async def sonarr_search_new_series(term: str) -> list:
     client = get_client()
     results = await client.search_series(term)
     # Return a simplified view
-    return [
+    items = [
         {
             "tvdbId": r.get("tvdbId"),
             "title": r.get("title"),
@@ -297,6 +302,7 @@ async def sonarr_search_new_series(term: str) -> list:
         }
         for r in results
     ]
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
@@ -342,7 +348,7 @@ async def sonarr_delete_series(series_id: int, delete_files: bool = False) -> di
 
 # Episode Tools
 @mcp.tool()
-async def sonarr_get_episodes(series_id: int) -> list:
+async def sonarr_get_episodes(series_id: int) -> dict:
     """Get all episodes for a specific series.
 
     Args:
@@ -350,7 +356,7 @@ async def sonarr_get_episodes(series_id: int) -> list:
     """
     client = get_client()
     episodes = await client.get_episodes(series_id)
-    return [
+    items = [
         {
             "id": e.get("id"),
             "seasonNumber": e.get("seasonNumber"),
@@ -362,22 +368,24 @@ async def sonarr_get_episodes(series_id: int) -> list:
         }
         for e in episodes
     ]
+    return {"items": items, "total": len(items)}
 
 
 @mcp.tool()
-async def sonarr_get_episode_files(series_id: int) -> list:
+async def sonarr_get_episode_files(series_id: int) -> dict:
     """Get downloaded episode files for a series.
 
     Args:
         series_id: The Sonarr series ID
     """
     client = get_client()
-    return await client.get_episode_files(series_id)
+    items = await client.get_episode_files(series_id)
+    return {"items": items, "total": len(items)}
 
 
 # Calendar Tools
 @mcp.tool()
-async def sonarr_get_calendar(days: int = 7, include_past_days: int = 0) -> list:
+async def sonarr_get_calendar(days: int = 7, include_past_days: int = 0) -> dict:
     """Get upcoming episodes from the calendar.
 
     Args:
@@ -389,7 +397,7 @@ async def sonarr_get_calendar(days: int = 7, include_past_days: int = 0) -> list
     end_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
 
     calendar = await client.get_calendar(start_date=start_date, end_date=end_date)
-    return [
+    items = [
         {
             "seriesTitle": e.get("series", {}).get("title"),
             "seasonNumber": e.get("seasonNumber"),
@@ -400,6 +408,7 @@ async def sonarr_get_calendar(days: int = 7, include_past_days: int = 0) -> list
         }
         for e in calendar
     ]
+    return {"items": items, "total": len(items)}
 
 
 # Queue Tools
