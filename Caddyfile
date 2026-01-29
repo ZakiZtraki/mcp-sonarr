@@ -242,7 +242,9 @@
 	# ==========================================================================
 	# REVERSE PROXY CONFIGURATION
 	# ==========================================================================
-	# This is the main proxy configuration for the MCP Sonarr server
+	# Proxy all requests to the MCP Sonarr server
+	# Authentication is handled by the application via OAuth 2.0
+	# (Configure OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_AUTH_PASSWORD)
 
 	reverse_proxy mcp-sonarr:8080 {
 		# ======================================================================
@@ -256,39 +258,14 @@
 		health_status 200
 
 		# ======================================================================
-		# LOAD BALANCING (for multiple backends)
-		# ======================================================================
-		# Uncomment if running multiple MCP server instances
-
-		# Load balancing policy: round_robin, least_conn, random, first, ip_hash, uri_hash, header, cookie
-		# lb_policy round_robin
-
-		# Additional backends for load balancing
-		# to mcp-sonarr-2:8080
-		# to mcp-sonarr-3:8080
-
-		# Sticky sessions (useful for stateful applications)
-		# lb_policy cookie mcp_session
-
-		# ======================================================================
 		# TIMEOUTS
 		# ======================================================================
-		# Adjust based on expected request duration
 
-		# Time to establish connection to upstream
 		transport http {
 			dial_timeout 30s
-
-			# Keep-alive settings
 			keepalive 30s
 			keepalive_idle_conns 10
-
-			# Response header timeout
 			response_header_timeout 60s
-
-			# TLS configuration for upstream (if using HTTPS to backend)
-			# tls
-			# tls_insecure_skip_verify  # Not recommended - only for self-signed certs
 		}
 
 		# ======================================================================
@@ -306,32 +283,6 @@
 		# Remove sensitive headers from responses
 		header_down -X-Powered-By
 		header_down -Server
-
-		# ======================================================================
-		# BUFFERING AND STREAMING
-		# ======================================================================
-		# Configure based on your response characteristics
-
-		# Disable response buffering for streaming responses
-		# flush_interval -1
-
-		# Enable buffering with specific size
-		# buffer_responses
-		# buffer_requests
-
-		# ======================================================================
-		# ERROR HANDLING
-		# ======================================================================
-		# Handle upstream errors gracefully
-
-		# Retry failed requests on other backends (if multiple backends configured)
-		# lb_try_duration 30s
-		# lb_try_interval 1s
-
-		# Custom error handling
-		# handle_response @error {
-		# 	respond "Service temporarily unavailable" 503
-		# }
 	}
 
 	# ==========================================================================
