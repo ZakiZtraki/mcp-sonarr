@@ -16,6 +16,7 @@ Environment Variables:
     OAUTH_AUTH_PASSWORD: Password for the authorization form (required for OAuth)
 """
 
+import html
 import os
 import secrets
 import logging
@@ -178,6 +179,7 @@ def verify_client_credentials(client_id: str, client_secret: str) -> bool:
 
 
 # HTML template for authorization form
+# Note: CSS braces are doubled ({{ and }}) to escape them for Python's .format()
 AUTHORIZATION_FORM_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -186,12 +188,12 @@ AUTHORIZATION_FORM_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Authorize MCP Sonarr</title>
     <style>
-        * {
+        * {{
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-        }
-        body {
+        }}
+        body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
@@ -199,72 +201,72 @@ AUTHORIZATION_FORM_HTML = """
             align-items: center;
             justify-content: center;
             padding: 20px;
-        }
-        .container {
+        }}
+        .container {{
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             padding: 40px;
             max-width: 400px;
             width: 100%;
-        }
-        .logo {
+        }}
+        .logo {{
             text-align: center;
             margin-bottom: 24px;
-        }
-        .logo svg {
+        }}
+        .logo svg {{
             width: 64px;
             height: 64px;
             fill: #e74c3c;
-        }
-        h1 {
+        }}
+        h1 {{
             color: #333;
             font-size: 24px;
             text-align: center;
             margin-bottom: 8px;
-        }
-        .subtitle {
+        }}
+        .subtitle {{
             color: #666;
             text-align: center;
             margin-bottom: 32px;
             font-size: 14px;
-        }
-        .client-info {
+        }}
+        .client-info {{
             background: #f8f9fa;
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 24px;
-        }
-        .client-info p {
+        }}
+        .client-info p {{
             color: #555;
             font-size: 14px;
-        }
-        .client-info strong {
+        }}
+        .client-info strong {{
             color: #333;
-        }
-        .form-group {
+        }}
+        .form-group {{
             margin-bottom: 20px;
-        }
-        label {
+        }}
+        label {{
             display: block;
             color: #333;
             font-weight: 500;
             margin-bottom: 8px;
             font-size: 14px;
-        }
-        input[type="password"] {
+        }}
+        input[type="password"] {{
             width: 100%;
             padding: 12px 16px;
             border: 2px solid #e1e5e9;
             border-radius: 8px;
             font-size: 16px;
             transition: border-color 0.2s;
-        }
-        input[type="password"]:focus {
+        }}
+        input[type="password"]:focus {{
             outline: none;
             border-color: #e74c3c;
-        }
-        .error {
+        }}
+        .error {{
             background: #fee;
             border: 1px solid #fcc;
             color: #c00;
@@ -272,12 +274,12 @@ AUTHORIZATION_FORM_HTML = """
             border-radius: 8px;
             margin-bottom: 20px;
             font-size: 14px;
-        }
-        .buttons {
+        }}
+        .buttons {{
             display: flex;
             gap: 12px;
-        }
-        button {
+        }}
+        button {{
             flex: 1;
             padding: 14px 20px;
             border: none;
@@ -286,37 +288,37 @@ AUTHORIZATION_FORM_HTML = """
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.1s, box-shadow 0.2s;
-        }
-        button:active {
+        }}
+        button:active {{
             transform: scale(0.98);
-        }
-        .btn-authorize {
+        }}
+        .btn-authorize {{
             background: #e74c3c;
             color: white;
-        }
-        .btn-authorize:hover {
+        }}
+        .btn-authorize:hover {{
             box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-        }
-        .btn-cancel {
+        }}
+        .btn-cancel {{
             background: #e1e5e9;
             color: #333;
-        }
-        .btn-cancel:hover {
+        }}
+        .btn-cancel:hover {{
             background: #d1d5d9;
-        }
-        .permissions {
+        }}
+        .permissions {{
             margin-bottom: 24px;
-        }
-        .permissions h3 {
+        }}
+        .permissions h3 {{
             color: #333;
             font-size: 14px;
             margin-bottom: 12px;
-        }
-        .permissions ul {
+        }}
+        .permissions ul {{
             list-style: none;
             padding: 0;
-        }
-        .permissions li {
+        }}
+        .permissions li {{
             color: #555;
             font-size: 14px;
             padding: 8px 0;
@@ -324,15 +326,15 @@ AUTHORIZATION_FORM_HTML = """
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        .permissions li:last-child {
+        }}
+        .permissions li:last-child {{
             border-bottom: none;
-        }
-        .permissions li::before {
+        }}
+        .permissions li::before {{
             content: "✓";
             color: #27ae60;
             font-weight: bold;
-        }
+        }}
     </style>
 </head>
 <body>
@@ -374,7 +376,7 @@ AUTHORIZATION_FORM_HTML = """
             </div>
 
             <div class="buttons">
-                <button type="button" class="btn-cancel" onclick="window.location.href='{redirect_uri}?error=access_denied&state={state}'">Cancel</button>
+                <button type="button" class="btn-cancel" onclick="window.location.href='{redirect_uri}?error=access_denied&amp;state={state}'">Cancel</button>
                 <button type="submit" class="btn-authorize">Authorize</button>
             </div>
         </form>
@@ -423,15 +425,15 @@ async def oauth_authorize(request: Request) -> HTMLResponse | RedirectResponse:
                 status_code=400,
             )
 
-        # Display authorization form
-        html = AUTHORIZATION_FORM_HTML.format(
-            client_id=client_id,
-            redirect_uri=redirect_uri,
-            state=state,
-            response_type=response_type,
+        # Display authorization form (escape user-provided values to prevent XSS)
+        html_content = AUTHORIZATION_FORM_HTML.format(
+            client_id=html.escape(client_id),
+            redirect_uri=html.escape(redirect_uri),
+            state=html.escape(state),
+            response_type=html.escape(response_type),
             error_html="",
         )
-        return HTMLResponse(html)
+        return HTMLResponse(html_content)
 
     elif request.method == "POST":
         # Process form submission
@@ -450,15 +452,15 @@ async def oauth_authorize(request: Request) -> HTMLResponse | RedirectResponse:
 
         # Verify password
         if not verify_password(password):
-            # Re-display form with error
-            html = AUTHORIZATION_FORM_HTML.format(
-                client_id=client_id,
-                redirect_uri=redirect_uri,
-                state=state,
+            # Re-display form with error (escape user-provided values to prevent XSS)
+            html_content = AUTHORIZATION_FORM_HTML.format(
+                client_id=html.escape(client_id),
+                redirect_uri=html.escape(redirect_uri),
+                state=html.escape(state),
                 response_type="code",
                 error_html='<div class="error">Invalid password. Please try again.</div>',
             )
-            return HTMLResponse(html, status_code=401)
+            return HTMLResponse(html_content, status_code=401)
 
         # Generate authorization code
         code = generate_authorization_code(client_id, redirect_uri)
