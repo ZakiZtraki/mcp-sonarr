@@ -17,6 +17,14 @@ from starlette.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
+from .auth import (
+    oauth_authorize,
+    oauth_token,
+    oauth_metadata,
+    OAuthMiddleware,
+    oauth_config,
+)
+
 import uvicorn
 from dotenv import load_dotenv
 
@@ -609,9 +617,13 @@ async def lifespan(app: Starlette):
 custom_routes = [
     Route("/health", endpoint=health, methods=["GET"]),
     Route("/info", endpoint=server_info, methods=["GET"]),
+    # OAuth 2.0 endpoints
+    Route("/oauth/authorize", endpoint=oauth_authorize, methods=["GET", "POST"]),
+    Route("/oauth/token", endpoint=oauth_token, methods=["POST"]),
+    Route("/.well-known/oauth-authorization-server", endpoint=oauth_metadata, methods=["GET"]),
 ]
 
-# Create middleware for CORS and proxy headers
+# Create middleware for CORS, auth, and proxy headers
 middleware = [
     Middleware(
         CORSMiddleware,
@@ -620,7 +632,8 @@ middleware = [
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
-    )
+    ),
+    Middleware(OAuthMiddleware),
 ]
 
 # Create the main application
@@ -643,6 +656,16 @@ def main():
     logger.info(f"Starting MCP Sonarr HTTP server on {host}:{port}")
     logger.info(f"MCP endpoint available at: http://{host}:{port}/mcp")
     logger.info(f"Health check available at: http://{host}:{port}/health")
+
+    # Log authentication status
+    if oauth_config.oauth_enabled:
+        logger.info("OAuth 2.0 authentication enabled")
+        logger.info(f"Authorization endpoint: http://{host}:{port}/oauth/authorize")
+        logger.info(f"Token endpoint: http://{host}:{port}/oauth/token")
+    elif oauth_config.simple_auth_token:
+        logger.info("Simple Bearer token authentication enabled")
+    else:
+        logger.warning("No authentication configured - server is open to all requests")
 
     # Run with proxy headers support for reverse proxy deployments (Traefik, nginx, etc.)
     # This fixes 421 Misdirected Request errors when behind a reverse proxy

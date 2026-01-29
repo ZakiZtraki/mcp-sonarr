@@ -12,11 +12,17 @@ services:
       - SONARR_URL=${SONARR_URL:-https://sonarr.zenmedia.live}
       # Required: Your Sonarr API key (get from Sonarr -> Settings -> General -> API Key)
       - SONARR_API_KEY=${SONARR_API_KEY}
-      # Optional: Authentication token for the MCP server
+      # Optional: Simple authentication token for the MCP server
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       # Optional: Server configuration
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8080
+      # OAuth 2.0 Configuration (for ChatGPT integration)
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
+      - OAUTH_AUTH_PASSWORD=${OAUTH_AUTH_PASSWORD:-}
+      - OAUTH_JWT_SECRET=${OAUTH_JWT_SECRET:-}
+      - OAUTH_ACCESS_TOKEN_EXPIRE_MINUTES=${OAUTH_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
