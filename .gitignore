@@ -74,3 +74,5 @@ venv.bak/
 
 # Project specific
 *.log
+Caddyfile
+stack.env
